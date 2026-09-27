@@ -76,7 +76,7 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
   }
 
   String _name(Map<String, dynamic> x) =>
-      ('\${x['id'] ?? 'reference'}')
+      ('${x['id'] ?? 'reference'}')
           .replaceAll(RegExp(r'[^a-zA-Z0-9._-]+'), '_')
           .toLowerCase() +
       '.pdf';
@@ -130,15 +130,15 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
   Future<void> _download(Map<String, dynamic> x) async {
     final file = await _file(x);
     if (await file.exists()) {
-      _open(file.path, '\${x['title'] ?? 'المرجع'}');
+      _open(file.path, '${x['title'] ?? 'المرجع'}');
       return;
     }
-    final url = '\${x['pdf_url'] ?? ''}'.trim();
+    final url = '${x['pdf_url'] ?? ''}'.trim();
     if (url.isEmpty) {
       _message('لا يوجد رابط للملف.');
       return;
     }
-    final id = '\${x['id']}';
+    final id = '${x['id']}';
     final temp = File(file.path + '.part');
     if (mounted) setState(() => _progress[id] = 0);
     try {
@@ -160,7 +160,7 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
           _downloaded.add(_name(x));
         });
       }
-      _open(file.path, '\${x['title'] ?? 'المرجع'}');
+      _open(file.path, '${x['title'] ?? 'المرجع'}');
     } catch (_) {
       if (await temp.exists()) await temp.delete();
       if (mounted) setState(() => _progress.remove(id));
@@ -229,7 +229,7 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
               children: [
                 Expanded(
                   child: Text(
-                    '\${_filtered.length} من أصل \${_items.length} مرجع',
+                    '${_filtered.length} من أصل ${_items.length} مرجع',
                     style: const TextStyle(color: Colors.white54, fontSize: 12),
                   ),
                 ),
@@ -260,7 +260,7 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
                           itemCount: _filtered.length,
                           itemBuilder: (_, i) {
                             final x = _filtered[i];
-                            final id = '\${x['id']}';
+                            final id = '${x['id']}';
                             final p = _progress[id];
                             final d = _downloaded.contains(_name(x));
 
@@ -292,7 +292,7 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
                                         ),
                                       ),
                                 title: Text(
-                                  '\${x['title'] ?? ''}',
+                                  '${x['title'] ?? ''}',
                                   textAlign: TextAlign.right,
                                   maxLines: 3,
                                   overflow: TextOverflow.ellipsis,
@@ -302,7 +302,7 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
                                   ),
                                 ),
                                 subtitle: Text(
-                                  '\${x['author'] ?? ''} — \${x['category'] ?? ''}\\n\${x['description'] ?? ''}',
+                                  '${x['author'] ?? ''} — ${x['category'] ?? ''}\\n${x['description'] ?? ''}',
                                   textAlign: TextAlign.right,
                                   maxLines: 3,
                                   overflow: TextOverflow.ellipsis,
