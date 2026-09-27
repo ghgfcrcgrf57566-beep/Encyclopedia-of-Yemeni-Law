@@ -248,6 +248,7 @@ async function lexicalSearch(
     article_text: String(row.article_text || ""),
     chapter: String(row.chapter || "") || null,
     score: 1 / (index + 1),
+    reference: `${String(row.law_name || "")} — المادة ${String(row.article_number || "")}`,
   }));
 }
 
@@ -307,6 +308,7 @@ async function semanticSearch(
       article_text: String(row.article_text || ""),
       chapter: String(row.chapter || "") || null,
       score: Number(match?.score || 0),
+      reference: `${String(row.law_name || "")} — المادة ${String(row.article_number || "")}`,
     }];
   });
 }
