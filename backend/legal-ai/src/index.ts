@@ -329,7 +329,7 @@ function tokenize(value: string): string[] {
 
   return [...new Set(
     normalized
-      .split(/s+/)
+      .split(/\s+/)
       .filter((token) => token.length >= 3 && !stopWords.has(token)),
   )];
 }
