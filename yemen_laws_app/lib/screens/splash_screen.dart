@@ -114,7 +114,7 @@ class _SplashScreenState extends State<SplashScreen> {
                                       padding:
                                           EdgeInsets.all(logoSize * 0.04),
                                       child: Image.asset(
-                                        'assets/icon/app_icon.png',
+                                        'assets/icon/app_icon.jpg',
                                         fit: BoxFit.contain,
                                         filterQuality: FilterQuality.high,
                                       ),
