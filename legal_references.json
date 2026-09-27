@@ -1,0 +1,90 @@
+[
+  {
+    "id": "sanhouri_01",
+    "title": "الجزء الأول: نظرية الالتزام بوجه عام (مصادر الالتزام)",
+    "author": "السنهوري",
+    "category": "القانون المدني",
+    "description": "شرح تفصيلي لمصادر الالتزام في القانون المدني المصري والعربي.",
+    "pdf_url": "https://github.com/ghgfcrcgrf57566-beep/yemen_laws_app/releases/download/v1.0.0/sanhouri_01.pdf"
+  },
+  {
+    "id": "sanhouri_02",
+    "title": "الجزء الثاني: نظرية الالتزام بوجه عام (الإثبات - آثار الالتزام)",
+    "author": "السنهوري",
+    "category": "القانون المدني",
+    "description": "أحكام الإثبات وآثار الالتزام وتنفيذه.",
+    "pdf_url": "https://github.com/ghgfcrcgrf57566-beep/yemen_laws_app/releases/download/v1.0.0/sanhouri_02.pdf"
+  },
+  {
+    "id": "sanhouri_04",
+    "title": "الجزء الرابع: العقود التي تقع على الملكية (البيع والمقايضة)",
+    "author": "السنهوري",
+    "category": "عقد البيع / القانون المدني",
+    "description": "شرح عقد البيع والمقايضة وأحكامهما القانونية.",
+    "pdf_url": "https://github.com/ghgfcrcgrf57566-beep/yemen_laws_app/releases/download/v1.0.0/sanhouri_04.pdf"
+  },
+  {
+    "id": "sanhouri_05",
+    "title": "الجزء الخامس: العقود التي تقع على الملكية - المجلد الثاني (الهبة والشركة والقرض والصلح)",
+    "author": "السنهوري",
+    "category": "القانون المدني",
+    "description": "أحكام عقود الهبة، الشركة، القرض، الدخل الدائم، والصلح.",
+    "pdf_url": "https://github.com/ghgfcrcgrf57566-beep/yemen_laws_app/releases/download/v1.0.0/sanhouri_05.pdf"
+  },
+  {
+    "id": "sanhouri_06_m1",
+    "title": "الجزء السادس - المجلد الأول: العقود الواردة على الانتفاع بالشيء (الإيجار والعارية)",
+    "author": "السنهوري",
+    "category": "عقد الإيجار / القانون المدني",
+    "description": "دراسة معمقة لعقود الإيجار والعارية.",
+    "pdf_url": "https://github.com/ghgfcrcgrf57566-beep/yemen_laws_app/releases/download/v1.0.0/sanhouri_06_m1.pdf"
+  },
+  {
+    "id": "sanhouri_06_m2",
+    "title": "الجزء السادس - المجلد الثاني: العقود الواردة على الانتفاع بالشيء (الإيجار والعارية)",
+    "author": "السنهوري",
+    "category": "عقد الإيجار / القانون المدني",
+    "description": "استكمال أحكام الإيجار والتطبيقات القضائية والفقهية.",
+    "pdf_url": "https://github.com/ghgfcrcgrf57566-beep/yemen_laws_app/releases/download/v1.0.0/sanhouri_06_m2.pdf"
+  },
+  {
+    "id": "sanhouri_07_m1",
+    "title": "الجزء السابع - المجلد الأول: العقود الواردة على العمل (المقاولة، الوكالة، الوديعة، الحراسة)",
+    "author": "السنهوري",
+    "category": "القانون المدني",
+    "description": "أحكام العقود التي ترد على العمل وكيفية تنظيمها.",
+    "pdf_url": "https://github.com/ghgfcrcgrf57566-beep/yemen_laws_app/releases/download/v1.0.0/sanhouri_07_m1.pdf"
+  },
+  {
+    "id": "sanhouri_07_m2",
+    "title": "الجزء السابع - المجلد الثاني: عقود الغرر (المقامرة، الرهان، المرتب مدى الحياة، التأمين)",
+    "author": "السنهوري",
+    "category": "القانون المدني",
+    "description": "شرح عقود الغرر وعقد التأمين وأحكامها.",
+    "pdf_url": "https://github.com/ghgfcrcgrf57566-beep/yemen_laws_app/releases/download/v1.0.0/sanhouri_07_m2.pdf"
+  },
+  {
+    "id": "sanhouri_08",
+    "title": "الجزء الثامن: حق الملكية مع شرح مفصل للأشياء والأموال",
+    "author": "السنهوري",
+    "category": "القانون المدني",
+    "description": "الأموال والأشياء ونطاق حق الملكية ووظائفه.",
+    "pdf_url": "https://github.com/ghgfcrcgrf57566-beep/yemen_laws_app/releases/download/v1.0.0/sanhouri_08.pdf"
+  },
+  {
+    "id": "sanhouri_09",
+    "title": "الجزء التاسع: أسباب كسب الملكية والحقوق العينية الأصلية (الانتفاع والارتفاق)",
+    "author": "السنهوري",
+    "category": "القانون المدني",
+    "description": "حقوق الانتفاع والارتفاق وأسباب كسب الملكية.",
+    "pdf_url": "https://github.com/ghgfcrcgrf57566-beep/yemen_laws_app/releases/download/v1.0.0/sanhouri_09.pdf"
+  },
+  {
+    "id": "sanhouri_10",
+    "title": "الجزء العاشر والأخير: التأمينات الشخصية والعينية",
+    "author": "السنهوري",
+    "category": "القانون المدني",
+    "description": "الكفالة، الرهن الرسمي، الرهن الحيازي، حقوق التأمين العينية والشخصية.",
+    "pdf_url": "https://github.com/ghgfcrcgrf57566-beep/yemen_laws_app/releases/download/v1.0.0/sanhouri_10.pdf"
+  }
+]
