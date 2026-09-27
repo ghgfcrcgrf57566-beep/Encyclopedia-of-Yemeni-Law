@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="512" height="512">
+  <defs>
+    <style>
+      .stroke{fill:none;stroke:#0B3D91;stroke-width:9;stroke-linecap:round;stroke-linejoin:round}
+      .fill-gold{fill:#C6861F}
+      .book-fill{fill:#FFFFFF;stroke:#0B3D91;stroke-width:6}
+    </style>
+  </defs>
+  <!-- كتاب مفتوح -->
+  <path class="book-fill" d="M30 220 L150 160 L270 220 L270 260 L150 200 L30 260 Z"/>
+  <line x1="150" y1="160" x2="150" y2="200" class="stroke"/>
+  <!-- ميزان فوق الكتاب -->
+  <line class="stroke" x1="150" y1="60" x2="150" y2="120"/>
+  <line class="stroke" x1="105" y1="100" x2="195" y2="100"/>
+  <line class="stroke" x1="120" y1="100" x2="120" y2="140"/>
+  <line class="stroke" x1="180" y1="100" x2="180" y2="140"/>
+  <circle cx="120" cy="158" r="20" class="stroke" />
+  <circle cx="180" cy="158" r="20" class="stroke" />
+  <!-- لمسة ذهبية في رأس الميزان -->
+  <circle cx="150" cy="60" r="8" class="fill-gold"/>
+</svg>
