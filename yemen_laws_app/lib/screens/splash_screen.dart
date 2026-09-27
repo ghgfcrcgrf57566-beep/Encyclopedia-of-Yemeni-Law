@@ -66,7 +66,7 @@ class _SplashScreenState extends State<SplashScreen> {
                           SizedBox(
                             width: compact ? 190 : 245,
                             height: compact ? 190 : 245,
-                            child: const CustomPaint(painter: _ScalesPainter()),
+                            child: CustomPaint(painter: _ScalesPainter()),
                           ),
                           SizedBox(height: compact ? 18 : 30),
                           const Text(
@@ -195,20 +195,20 @@ class _ScalesPainter extends CustomPainter {
     final fill = Paint()..color = const Color(0xFFD2A957);
     final shadow = Paint()..color = const Color(0x55000000);
 
-    canvas.drawOval(const Rect.fromLTWH(48, 207, 149, 14), shadow);
-    canvas.drawOval(const Rect.fromLTWH(58, 196, 129, 20), fill);
-    canvas.drawRRect(const RRect.fromRectAndRadius(Rect.fromLTWH(116, 71, 13, 131), Radius.circular(6)), fill);
-    canvas.drawCircle(const Offset(122.5, 58), 9, fill);
-    canvas.drawLine(const Offset(47, 64), const Offset(198, 64), gold);
-    canvas.drawLine(const Offset(122.5, 33), const Offset(122.5, 64), gold);
-    canvas.drawLine(const Offset(47, 64), const Offset(47, 119), gold);
-    canvas.drawLine(const Offset(198, 64), const Offset(198, 119), gold);
-    canvas.drawLine(const Offset(47, 64), const Offset(23, 119), gold);
-    canvas.drawLine(const Offset(47, 64), const Offset(71, 119), gold);
-    canvas.drawLine(const Offset(198, 64), const Offset(174, 119), gold);
-    canvas.drawLine(const Offset(198, 64), const Offset(222, 119), gold);
-    canvas.drawOval(const Rect.fromLTWH(16, 116, 62, 15), gold);
-    canvas.drawOval(const Rect.fromLTWH(167, 116, 62, 15), gold);
+    canvas.drawOval(Rect.fromLTWH(48, 207, 149, 14), shadow);
+    canvas.drawOval(Rect.fromLTWH(58, 196, 129, 20), fill);
+    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(116, 71, 13, 131), Radius.circular(6)), fill);
+    canvas.drawCircle(Offset(122.5, 58), 9, fill);
+    canvas.drawLine(Offset(47, 64), Offset(198, 64), gold);
+    canvas.drawLine(Offset(122.5, 33), Offset(122.5, 64), gold);
+    canvas.drawLine(Offset(47, 64), Offset(47, 119), gold);
+    canvas.drawLine(Offset(198, 64), Offset(198, 119), gold);
+    canvas.drawLine(Offset(47, 64), Offset(23, 119), gold);
+    canvas.drawLine(Offset(47, 64), Offset(71, 119), gold);
+    canvas.drawLine(Offset(198, 64), Offset(174, 119), gold);
+    canvas.drawLine(Offset(198, 64), Offset(222, 119), gold);
+    canvas.drawOval(Rect.fromLTWH(16, 116, 62, 15), gold);
+    canvas.drawOval(Rect.fromLTWH(167, 116, 62, 15), gold);
     canvas.drawPath(Path()..moveTo(82, 64)..quadraticBezierTo(122, 42, 163, 64), gold);
   }
 
