@@ -49,7 +49,7 @@ flutter:
 
   assets:
     - assets/db/app_database.db
-    - assets/icon/app_icon.png
+    - assets/icon/app_icon.jpg
 
   # في حال أضفت خطوطًا عربية مخصصة (مثل خط "Cairo" أو "Tajawal") ضعها هنا:
   # fonts:
@@ -63,5 +63,5 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: false
-  image_path: "assets/icon/app_icon.png"
+  image_path: "assets/icon/app_icon.jpg"
   min_sdk_android: 21
