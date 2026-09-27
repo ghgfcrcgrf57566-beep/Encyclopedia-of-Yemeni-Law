@@ -13,6 +13,7 @@ import 'favorites/favorites_screen.dart';
 import 'feedback/feedback_screen.dart';
 import 'laws/laws_home_screen.dart';
 import 'supreme_court_screen.dart';
+import 'legal_references_screen.dart';
 import 'legal_ai/legal_ai_screen.dart';
 
 class RootShell extends StatelessWidget {
@@ -30,7 +31,7 @@ class RootShell extends StatelessWidget {
           icon: Icons.menu_book_rounded,
           title: 'المراجع القانونية',
           subtitle: 'كتب وشروحات وأبحاث قانونية',
-          builder: (_) => const ComingSoonScreen(title: 'المراجع القانونية'),
+          builder: (_) => const LegalReferencesScreen(),
         ),
         _SectionData(
           icon: Icons.balance_rounded,
