@@ -259,8 +259,8 @@ class _Message extends StatelessWidget{
               alignment: Alignment.centerRight,
               child: Text(
                 m.result!.responseSource == 'local_db'
-                    ? 'المصدر: قاعدة القوانين المحلية'
-                    : 'المصدر: Gemini AI بعد عدم العثور على نص محلي',
+                    ? 'المصدر: نصوص الموسوعة + تحليل الذكاء الاصطناعي'
+                    : 'المصدر: بحث الويب عبر الذكاء الاصطناعي (احتياطي)',
                 textAlign: TextAlign.right,
                 style: TextStyle(
                   fontSize: 11,
@@ -271,7 +271,7 @@ class _Message extends StatelessWidget{
             ),
             if(m.result!.sources.isNotEmpty)...[
               const SizedBox(height:16),
-              Text('المصادر القانونية',textAlign:TextAlign.right,style:TextStyle(fontWeight:FontWeight.w900,color:context.textPrimary)),
+              Text('المواد القانونية المستخدمة',textAlign:TextAlign.right,style:TextStyle(fontWeight:FontWeight.w900,color:context.textPrimary)),
               const SizedBox(height:8),
               for(final s in m.result!.sources)_Source(s:s),
             ],
