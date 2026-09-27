@@ -12,6 +12,7 @@ export type AIProviderSource = {
   article_text: string;
   chapter?: string | null;
   score?: number;
+  reference?: string;
 };
 
 export type AIProviderInput = {
