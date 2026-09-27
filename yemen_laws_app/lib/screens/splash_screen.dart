@@ -48,10 +48,12 @@ class _SplashScreenState extends State<SplashScreen> {
         backgroundColor: Colors.black,
         body: Stack(
           fit: StackFit.expand,
+          alignment: Alignment.center,
           children: [
             Image.asset(
               'assets/images/splash.jpg',
               fit: BoxFit.cover,
+              alignment: Alignment.center,
               filterQuality: FilterQuality.high,
             ),
             Positioned(
