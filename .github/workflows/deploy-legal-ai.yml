@@ -94,12 +94,17 @@ jobs:
         run: npx wrangler deploy
 
       - name: Semantic reindex legal corpus
-        if: steps.cloudflare.outputs.configured == 'true' && secrets.REINDEX_TOKEN != ''
+        if: steps.cloudflare.outputs.configured == 'true'
         working-directory: backend/legal-ai
         env:
           LEGAL_AI_BASE_URL: https://odd-mouse-c1e0.ghgfcrcgrf57566.workers.dev
           REINDEX_TOKEN: ${{ secrets.REINDEX_TOKEN }}
-        run: bash scripts/reindex.sh
+        run: |
+          if [ -z "$REINDEX_TOKEN" ]; then
+            echo "REINDEX_TOKEN is not configured; semantic reindex is skipped. Lexical legal search remains available."
+            exit 0
+          fi
+          bash scripts/reindex.sh
       - name: Verify Legal AI endpoints
         if: steps.cloudflare.outputs.configured == 'true'
         env:
