@@ -77,8 +77,7 @@ class LegalAiService {
       );
     }
 
-    // المساعد يعمل بالبحث عبر الإنترنت فقط.
-    // لا نبحث في قاعدة القوانين المحلية ولا نستخدمها لتحديد إجابة السؤال.
+    // المساعد يبحث أولاً في قاعدة القوانين المركزية، ثم يستخدم الذكاء الاصطناعي لصياغة الإجابة. الويب احتياطي عند عدم العثور على نص محلي.
     final baseUrl = AppConfig.legalAiBaseUrl.trim().replaceFirst(
           RegExp(r'\/$'),
           '',
@@ -146,7 +145,7 @@ class LegalAiService {
             .toList(),
         conversationId: body['conversation_id']?.toString(),
         responseSource:
-            responseSource.isEmpty ? 'gemini_ai' : responseSource,
+            responseSource.isEmpty ? 'web_search' : responseSource,
       );
 
       await _saveHistorySafely(
