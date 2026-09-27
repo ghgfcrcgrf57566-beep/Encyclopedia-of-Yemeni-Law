@@ -93,6 +93,13 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler deploy
 
+      - name: Semantic reindex legal corpus
+        if: steps.cloudflare.outputs.configured == 'true' && secrets.REINDEX_TOKEN != ''
+        working-directory: backend/legal-ai
+        env:
+          LEGAL_AI_BASE_URL: https://odd-mouse-c1e0.ghgfcrcgrf57566.workers.dev
+          REINDEX_TOKEN: ${{ secrets.REINDEX_TOKEN }}
+        run: bash scripts/reindex.sh
       - name: Verify Legal AI endpoints
         if: steps.cloudflare.outputs.configured == 'true'
         env:
