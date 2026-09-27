@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yemen_law/data/models/madda.dart';
 import 'package:yemen_law/services/chat_history_db.dart';
 import 'package:yemen_law/services/legal_ai_service.dart';
 
@@ -19,22 +18,19 @@ void main() {
     expect(entry.sourceLabel, 'قاعدة القوانين المحلية');
   });
 
-  test('local legal source keeps article and law metadata', () {
-    final source = LegalAiSource.fromMadda(
-      const Madda(
-        id: 11,
-        lawId: 2,
-        number: '15',
-        body: 'نص المادة',
-        orderNum: 15,
-        lawName: 'القانون المدني',
-        babLabel: 'العقود',
-      ),
-    );
+  test('parses web-grounded legal source metadata', () {
+    final source = LegalAiSource.fromJson({
+      'article_id': 11,
+      'law_name': 'القانون المدني',
+      'article_number': '15',
+      'article_text': 'نص المادة',
+      'reference': 'القانون المدني — المادة 15',
+    });
 
     expect(source.articleId, 11);
     expect(source.lawName, 'القانون المدني');
     expect(source.articleNumber, '15');
+    expect(source.articleText, 'نص المادة');
     expect(source.reference, contains('القانون المدني'));
   });
 }
