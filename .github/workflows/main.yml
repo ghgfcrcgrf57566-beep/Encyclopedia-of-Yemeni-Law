@@ -18,7 +18,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
@@ -86,29 +86,42 @@ jobs:
       - name: Build release APK
         run: flutter build apk --release --dart-define=LEGAL_AI_BASE_URL="$LEGAL_AI_BASE_URL"
 
-      - name: Validate Supreme Court PDF URLs
-        working-directory: ${{ github.workspace }}
-        continue-on-error: true
+      - name: Check if Supreme Court PDF release exists
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          set +e
+          set -e
+          if gh release view v1.0.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "SC_BOOKS_VALIDATION_SKIPPED=false" >> "$GITHUB_ENV"
+          else
+            echo "No GitHub release v1.0.0 is published yet for Supreme Court PDFs; skipping external URL validation until the assets exist."
+            echo "SC_BOOKS_VALIDATION_SKIPPED=true" >> "$GITHUB_ENV"
+          fi
+
+      - name: Validate Supreme Court PDF URLs
+        if: env.SC_BOOKS_VALIDATION_SKIPPED != 'true'
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -e
           jq -r '.[].download_url' sc_books.json > /tmp/sc_book_urls.txt
           count=$(wc -l < /tmp/sc_book_urls.txt)
           if [ "$count" -ne 21 ]; then
-            echo "::warning::Expected 21 Supreme Court PDF URLs, found $count"
-            exit 0
+            echo "Expected 21 Supreme Court PDF URLs, found $count"
+            exit 1
           fi
 
           missing=0
           while IFS= read -r url; do
             echo "Checking $url"
             if ! curl -fsSLI --max-time 20 "$url" >/dev/null; then
-              echo "::warning::Supreme Court PDF unavailable: $url"
+              echo "MISSING: $url"
               missing=1
             fi
           done < /tmp/sc_book_urls.txt
 
           if [ "$missing" -ne 0 ]; then
-            echo "::warning::One or more Supreme Court PDF assets are unavailable. APK build will continue; downloads will work once the referenced PDF assets are published."
+            echo "One or more Supreme Court PDF assets are unavailable."
+            exit 1
           else
             echo "All Supreme Court PDF URLs are reachable."
           fi
