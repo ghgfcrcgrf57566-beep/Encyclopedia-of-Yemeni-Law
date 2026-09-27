@@ -50,6 +50,7 @@ flutter:
   assets:
     - assets/db/app_database.db
     - assets/icon/app_icon.jpg
+    - assets/images/splash.jpg
 
   # في حال أضفت خطوطًا عربية مخصصة (مثل خط "Cairo" أو "Tajawal") ضعها هنا:
   # fonts:
