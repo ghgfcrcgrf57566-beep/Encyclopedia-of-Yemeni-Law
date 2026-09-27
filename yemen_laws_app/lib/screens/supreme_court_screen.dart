@@ -230,6 +230,65 @@ class _SupremeCourtScreenState extends State<SupremeCourtScreen> {
     }
   }
 
+  Future<void> _downloadFromCard(Map<String, dynamic> book) async {
+    final file = await _localFile(book);
+    if (await file.exists()) {
+      _downloaded.add(
+        _safeFileName('${book['file_name'] ?? book['id']}'),
+      );
+      if (mounted) {
+        setState(() {});
+        _openPdf(file.path, '${book['title'] ?? ''}');
+      }
+      return;
+    }
+
+    final url = '${book['download_url'] ?? ''}'.trim();
+    if (url.isEmpty) {
+      _showMessage('لا يوجد رابط تنزيل لهذا الكتاب.');
+      return;
+    }
+
+    final id = '${book['id'] ?? book['file_name']}';
+    final temp = File('${file.path}.part');
+
+    if (mounted) {
+      setState(() => _progress[id] = 0);
+    }
+
+    try {
+      await _dio.download(
+        url,
+        temp.path,
+        deleteOnError: true,
+        options: Options(followRedirects: true, maxRedirects: 5),
+        onReceiveProgress: (received, total) {
+          if (!mounted || total <= 0) return;
+          setState(() => _progress[id] = received / total);
+        },
+      );
+
+      if (!await temp.exists()) {
+        throw const FileSystemException('download_failed');
+      }
+      if (await file.exists()) await file.delete();
+      await temp.rename(file.path);
+
+      _downloaded.add(
+        _safeFileName('${book['file_name'] ?? book['id']}'),
+      );
+      if (!mounted) return;
+      setState(() => _progress[id] = 1);
+      _openPdf(file.path, '${book['title'] ?? ''}');
+    } catch (_) {
+      if (await temp.exists()) await temp.delete();
+      if (mounted) {
+        setState(() => _progress.remove(id));
+        _showMessage('تعذر تنزيل الملف. تأكد من الاتصال بالإنترنت.');
+      }
+    }
+  }
+
   void _showMessage(String text) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -504,7 +563,9 @@ class _SupremeCourtScreenState extends State<SupremeCourtScreen> {
                                 downloaded:
                                     _downloaded.contains(key),
                                 partLabel: _partLabel(book),
+                                progress: _progress['${book['id'] ?? book['file_name']}'],
                                 onTap: () => _showBook(book),
+                                onDownload: () => _downloadFromCard(book),
                               ),
                             );
                           },
@@ -521,17 +582,24 @@ class _BookCard extends StatelessWidget {
   final Map<String, dynamic> book;
   final bool downloaded;
   final String partLabel;
+  final double? progress;
   final VoidCallback onTap;
+  final VoidCallback onDownload;
 
   const _BookCard({
     required this.book,
     required this.downloaded,
     required this.partLabel,
+    required this.progress,
     required this.onTap,
+    required this.onDownload,
   });
 
   @override
   Widget build(BuildContext context) {
+    final value = (progress ?? 0).clamp(0.0, 1.0).toDouble();
+    final downloading = value > 0 && value < 1;
+
     return Card(
       color: _surface,
       margin: EdgeInsets.zero,
@@ -547,59 +615,107 @@ class _BookCard extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '${book['title'] ?? 'الكتاب'}',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.right,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 15,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.menu_book_rounded,
-                          color: _gold,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 5),
-                        Text(
-                          partLabel,
-                          style: const TextStyle(
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 46,
+                  height: 46,
+                  child: downloading
+                      ? Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            CircularProgressIndicator(
+                              value: value,
+                              strokeWidth: 3,
+                              color: _gold,
+                              backgroundColor: Colors.white12,
+                            ),
+                            Text(
+                              '${(value * 100).round()}%',
+                              style: const TextStyle(
+                                color: _goldLight,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        )
+                      : IconButton(
+                          tooltip: downloaded
+                              ? 'قراءة الكتاب'
+                              : 'تنزيل الكتاب',
+                          onPressed: onDownload,
+                          icon: Icon(
+                            downloaded
+                                ? Icons.menu_book_rounded
+                                : Icons.download_rounded,
                             color: _gold,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12.5,
+                            size: 27,
+                          ),
+                          style: IconButton.styleFrom(
+                            backgroundColor: _gold.withValues(alpha: 0.08),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      '${book['description'] ?? ''}',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.right,
-                      style: const TextStyle(
-                        color: Colors.white54,
-                        height: 1.45,
-                        fontSize: 11.5,
-                      ),
-                    ),
-                  ],
                 ),
-              ),
-            ],
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '${book['title'] ?? 'الكتاب'}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.menu_book_rounded,
+                            color: _gold,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            partLabel,
+                            style: const TextStyle(
+                              color: _gold,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        '${book['description'] ?? ''}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(
+                          color: Colors.white54,
+                          height: 1.45,
+                          fontSize: 11.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
