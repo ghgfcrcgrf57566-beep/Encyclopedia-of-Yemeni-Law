@@ -37,18 +37,6 @@ class LegalAiSource {
       reference: json['reference']?.toString(),
     );
   }
-
-  factory LegalAiSource.fromMadda(Madda madda) {
-    return LegalAiSource(
-      articleId: madda.id,
-      lawName: madda.lawName ?? 'القوانين اليمنية',
-      articleNumber: madda.number,
-      articleText: madda.body,
-      chapter: madda.faslLabel ?? madda.babLabel,
-      reference:
-          '${madda.lawName ?? 'القانون'} — المادة ${madda.number}',
-    );
-  }
 }
 
 class LegalAiResult {
@@ -120,7 +108,6 @@ class LegalAiService {
             body: jsonEncode({
               'message': q,
               'language': 'ar',
-              'fallback_from_local': true,
               if (conversationId != null) 'conversation_id': conversationId,
               if (history.isNotEmpty) 'history': history,
             }),
@@ -147,7 +134,7 @@ class LegalAiService {
 
       final result = LegalAiResult(
         answer: answer.isEmpty
-            ? 'تعذر توليد إجابة من المواد القانونية المسترجعة.'
+            ? 'تعذر توليد إجابة من خدمة المساعد.'
             : answer,
         sources: rawSources
             .whereType<Map>()
@@ -176,23 +163,6 @@ class LegalAiService {
         'تعذر الاتصال بخدمة المساعد. تحقق من اتصال الإنترنت وحاول مرة أخرى.',
       );
     }
-  }
-
-  String _buildLocalAnswer(List<LegalAiSource> sources) {
-    final buffer = StringBuffer(
-      'تم العثور على نص قانوني مطابق في قاعدة القوانين المحلية للتطبيق.\n',
-    );
-
-    for (var i = 0; i < sources.length; i++) {
-      final source = sources[i];
-      buffer
-        ..writeln()
-        ..writeln('${i + 1}) ${source.lawName}')
-        ..writeln('المادة (${source.articleNumber})')
-        ..writeln(source.articleText);
-    }
-
-    return buffer.toString().trim();
   }
 
   Future<void> _saveHistorySafely({
