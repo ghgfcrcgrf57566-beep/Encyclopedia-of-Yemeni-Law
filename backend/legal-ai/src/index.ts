@@ -316,7 +316,6 @@ function tokenize(value: string): string[] {
     .replace(/[ًٌٍَُِّْـ]/g, "")
     .replace(/[أإآ]/g, "ا")
     .replace(/ى/g, "ي")
-    .replace(/ة/g, "ه")
     .replace(/[^؀-ۿ0-9a-zA-Z]+/g, " ")
     .trim();
 
