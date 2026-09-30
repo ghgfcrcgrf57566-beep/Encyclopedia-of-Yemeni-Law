@@ -222,53 +222,92 @@ class LegalAiService {
       ],
     });
 
-    final response = await http
-        .post(
-          uri,
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'x-goog-api-key': AppConfig.geminiApiKey.trim(),
-          },
-          body: jsonEncode({
-            'systemInstruction': {
-              'parts': [
-                {
-                  'text': '''
-أنت المساعد الذكي داخل تطبيق «موسوعة القوانين اليمنية».
-أجب باللغة العربية وبأسلوب قانوني واضح ومتحفظ.
+    const retryDelays = <int>[2, 4, 6];
+    http.Response? response;
+    Map<String, dynamic> body = {};
 
-قواعد الإجابة:
-- قاعدة البيانات القانونية المحلية هي المصدر القانوني الأساسي.
-- إذا أُرفقت مواد مستخرجة من قاعدة القوانين المحلية، فاعتمد عليها كأساس للإجابة والتحليل.
+    for (var attempt = 0; attempt <= retryDelays.length; attempt++) {
+      if (attempt > 0) {
+        await Future<void>.delayed(
+          Duration(seconds: retryDelays[attempt - 1]),
+        );
+      }
+
+      try {
+        response = await http
+            .post(
+              uri,
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'x-goog-api-key': AppConfig.geminiApiKey.trim(),
+              },
+              body: jsonEncode({
+                'systemInstruction': {
+                  'parts': [
+                    {
+                      'text': '''
+أنت «المساعد القانوني الذكي» لموسوعة القوانين اليمنية.
+تتميز بشخصية ودودة، مرحبة، ومهذبة للغاية، مع الحفاظ على الدقة والرصانة القانونية.
+
+التزم بالقواعد التالية في طريقة حديثك:
+1. ابدأ إجابتك دائماً بعبارة ترحيبية لطيفة ودافئة، مثل: «أهلاً بك عزيزي»، «مرحباً بك أستاذي الكريم»، أو «يسعدني إجابتك على هذا الاستفسار».
+2. اشرح الفكرة والجوانب القانونية بلغة بسيطة ومرنة وواضحة يفهمها غير المتخصصين، دون جمود أو اكتفاء بسرد المواد القانونية بشكل جاف.
+3. اختم حديثك دائماً بسؤال ودودي أو اقتراح لطيف لتشجيع المستخدم على الاستفسار عن تفاصيل أكثر.
+
+قواعد قانونية مهمة:
+- قاعدة البيانات القانونية المحلية هي المصدر الأساسي عندما تكون المواد المرفقة مطابقة لموضوع السؤال.
+- لا تعتبر أي مادة مصدراً للسؤال لمجرد أنها ظهرت في نتائج البحث؛ إذا كانت لا تتعلق بموضوع السؤال فتجاهلها ولا تستشهد بها.
+- إذا أُرفقت مواد محلية مطابقة، فاعتمد عليها كأساس للإجابة والتحليل.
 - لا تغيّر نص المادة ولا تنسب إليها نصاً غير موجود.
 - عند الاستشهاد، اذكر اسم القانون ورقم المادة.
 - فرّق بوضوح بين «النص القانوني» و«التحليل والشرح».
-- إذا كانت المواد المحلية لا تكفي للإجابة، اذكر حدودها ولا تخترع حكماً قانونياً.
-- إذا لم تكن متأكداً من نص قانوني محدد، صرّح بذلك بوضوح.
-- ميّز بين المعلومة العامة وبين النص القانوني الملزم.
+- إذا كانت المواد المحلية غير كافية أو غير مطابقة، صرّح بذلك ولا تخترع نصاً أو حكماً قانونياً.
 - لا تدّعِ أن إجابتك فتوى أو حكم قضائي ملزم.
-- لا تذكر اسم مزود الذكاء الاصطناعي أو تفاصيل البنية التقنية للمستخدم؛ قدم نفسك باسم «المساعد» فقط.
+- لا تذكر اسم مزود الذكاء الاصطناعي أو تفاصيل البنية التقنية للمستخدم؛ قدم نفسك باسم «المساعد القانوني الذكي» فقط.
 ''',
+                    },
+                  ],
                 },
-              ],
-            },
-            'contents': contents,
-            'generationConfig': {
-              'temperature': 0.2,
-            },
-          }),
-        )
-        .timeout(const Duration(seconds: 45));
+                'contents': contents,
+                'generationConfig': {
+                  'temperature': 0.2,
+                },
+              }),
+            )
+            .timeout(const Duration(seconds: 45));
 
-    Map<String, dynamic> body = {};
-    try {
-      body = jsonDecode(response.body) as Map<String, dynamic>;
-    } catch (_) {}
+        body = {};
+        try {
+          body = jsonDecode(response.body) as Map<String, dynamic>;
+        } catch (_) {}
 
-    if (response.statusCode != 200) {
-      final apiMessage = _extractApiError(body);
-      throw LegalAiException(apiMessage ?? _status(response.statusCode));
+        if (response.statusCode == 200) break;
+
+        if (!_isTemporaryGeminiFailure(response.statusCode, body) ||
+            attempt == retryDelays.length) {
+          final apiMessage = _extractApiError(body);
+          throw LegalAiException(
+            _isTemporaryGeminiFailure(response.statusCode, body)
+                ? 'الخدمة مشغولة حالياً. تمت إعادة المحاولة تلقائياً، ويرجى المحاولة بعد قليل إذا استمر الخطأ.'
+                : (apiMessage ?? _status(response.statusCode)),
+          );
+        }
+      } catch (e) {
+        if (e is LegalAiException) rethrow;
+        if (attempt == retryDelays.length) {
+          throw const LegalAiException(
+            'تعذر الاتصال بالمساعد الذكي. تحقق من اتصال الإنترنت وحاول مرة أخرى.',
+          );
+        }
+      }
+    }
+
+    final successfulResponse = response;
+    if (successfulResponse == null || successfulResponse.statusCode != 200) {
+      throw const LegalAiException(
+        'الخدمة مشغولة حالياً. تمت إعادة المحاولة تلقائياً، ويرجى المحاولة بعد قليل إذا استمر الخطأ.',
+      );
     }
 
     final answer = _extractGeneratedText(body);
@@ -336,6 +375,19 @@ class LegalAiService {
     }
 
     return buffer.toString().trim();
+  }
+
+  bool _isTemporaryGeminiFailure(
+    int statusCode,
+    Map<String, dynamic> body,
+  ) {
+    if ({429, 500, 502, 503, 504}.contains(statusCode)) return true;
+
+    final message = _extractApiError(body)?.toLowerCase() ?? '';
+    return message.contains('high demand') ||
+        message.contains('overloaded') ||
+        message.contains('temporarily unavailable') ||
+        message.contains('temporarily busy');
   }
 
   String? _extractApiError(Map<String, dynamic> body) {
