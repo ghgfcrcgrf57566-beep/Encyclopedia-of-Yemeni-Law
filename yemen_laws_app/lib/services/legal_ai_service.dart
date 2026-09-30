@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../core/app_config.dart';
+import '../data/models/madda.dart';
+import '../data/repositories/laws_repository.dart';
 import 'chat_history_db.dart';
 
 class LegalAiSource {
@@ -39,6 +41,82 @@ class LegalAiSource {
   }
 }
 
+  String _buildLocalAnswer(List<Madda> matches) {
+    if (matches.length == 1) {
+      final m = matches.first;
+      final law = m.lawName?.trim();
+      final lawText = law == null || law.isEmpty ? '' : ' — ' + law;
+      return 'وجدت في قاعدة القوانين المحلية المادة (' + m.number + ')' + lawText + ':\n\n' + m.body.trim();
+    }
+    final buffer = StringBuffer('وجدت ' + matches.length.toString() + ' مواد مرتبطة بسؤالك في قاعدة القوانين المحلية:\n');
+    for (var i = 0; i < matches.length; i++) {
+      final m = matches[i];
+      final law = m.lawName?.trim();
+      buffer
+        ..write('\n' + (i + 1).toString() + '. المادة (' + m.number + ')')
+        ..write(law == null || law.isEmpty ? '' : ' — ' + law)
+        ..write('\n' + m.body.trim() + '\n');
+    }
+    return buffer.toString().trim();
+  }
+
+  Future<LegalAiResult> _askGemini({
+    required String question,
+    String? conversationId,
+    required List<Map<String, String>> history,
+  }) async {
+    final model = AppConfig.geminiModel.trim().isEmpty ? 'gemini-3.8-flash' : AppConfig.geminiModel.trim();
+    final uri = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent');
+    final contents = <Map<String, dynamic>>[];
+    for (final item in history) {
+      final role = item['role'] == 'assistant' ? 'model' : 'user';
+      final content = item['content']?.trim() ?? '';
+      if (content.isEmpty) continue;
+      contents.add({'role': role, 'parts': [{'text': content}]});
+    }
+    contents.add({'role': 'user', 'parts': [{'text': question}]});
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'x-goog-api-key': AppConfig.geminiApiKey.trim(),
+      },
+      body: jsonEncode({
+        'systemInstruction': {'parts': [{'text': 'أنت المساعد الذكي داخل تطبيق «موسوعة القوانين اليمنية». أجب باللغة العربية وبأسلوب قانوني واضح ومتحفظ. قاعدة مهمة: لم يجد البحث المحلي مادة مناسبة لهذا السؤال، لذلك لا تخترع أرقام مواد أو نصوص قوانين أو أحكاماً قضائية. إذا لم تكن متأكداً من نص قانوني محدد، صرّح بذلك بوضوح. ميّز بين المعلومة العامة وبين النص القانوني الملزم، ولا تدّعِ أن إجابتك فتوى أو حكم قضائي ملزم. لا تذكر اسم مزود الذكاء الاصطناعي أو تفاصيل البنية التقنية للمستخدم؛ قدم نفسك باسم «المساعد» فقط.'}]},
+        'contents': contents,
+        'generationConfig': {'temperature': 0.2},
+      }),
+    ).timeout(const Duration(seconds: 45));
+    Map<String, dynamic> body = {};
+    try { body = jsonDecode(response.body) as Map<String, dynamic>; } catch (_) {}
+    if (response.statusCode != 200) {
+      final apiMessage = _extractApiError(body);
+      throw LegalAiException(apiMessage ?? _status(response.statusCode));
+    }
+    final answer = _extractGeneratedText(body);
+    if (answer.isEmpty) throw const LegalAiException('تعذر توليد إجابة من المساعد الذكي.');
+    return LegalAiResult(answer: answer, sources: const [], conversationId: conversationId, responseSource: 'gemini_ai');
+  }
+
+  String _extractGeneratedText(Map<String, dynamic> body) {
+    final candidates = body['candidates'];
+    if (candidates is! List || candidates.isEmpty) return '';
+    final content = candidates.first is Map ? (candidates.first as Map)['content'] : null;
+    if (content is! Map) return '';
+    final parts = content['parts'];
+    if (parts is! List) return '';
+    final buffer = StringBuffer();
+    for (final part in parts) { if (part is Map && part['text'] != null) buffer.write(part['text'].toString()); }
+    return buffer.toString().trim();
+  }
+
+  String? _extractApiError(Map<String, dynamic> body) {
+    final error = body['error'];
+    if (error is Map && error['message'] != null) return error['message'].toString();
+    return null;
+  }
+
 class LegalAiResult {
   final String answer;
   final List<LegalAiSource> sources;
@@ -59,6 +137,7 @@ class LegalAiService {
   static final instance = LegalAiService._();
 
   final ChatHistoryDb _historyDb = ChatHistoryDb.instance;
+  final LawsRepository _lawsRepository = LawsRepository.instance;
 
   Future<LegalAiResult> ask({
     required String question,
