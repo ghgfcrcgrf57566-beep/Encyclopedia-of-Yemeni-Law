@@ -184,7 +184,7 @@ class LegalAiService {
 
     final uri = Uri.parse(
       'https://generativelanguage.googleapis.com/v1beta/models/'
-      '$' + '{model}:generateContent',
+      model + ':generateContent',
     );
 
     final contents = <Map<String, dynamic>>[];
