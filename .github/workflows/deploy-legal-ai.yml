@@ -18,41 +18,56 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Check Cloudflare credentials
-        id: cloudflare
+      - name: Check deployment mode
+        id: config
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          echo "cloudflare_token_present=$([ -n "$CLOUDFLARE_API_TOKEN" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          echo "cloudflare_account_present=$([ -n "$CLOUDFLARE_ACCOUNT_ID" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          echo "gemini_key_present=$([ -n "$GEMINI_API_KEY" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ] && [ -n "$GEMINI_API_KEY" ]; then
+            echo "mode=cloudflare" >> "$GITHUB_OUTPUT"
             echo "configured=true" >> "$GITHUB_OUTPUT"
-          else
+            echo "Cloudflare deployment is fully configured."
+          elif [ -n "$GEMINI_API_KEY" ]; then
+            echo "mode=gemini-only" >> "$GITHUB_OUTPUT"
             echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "Required deployment secrets are incomplete; deployment is skipped."
+            echo "Cloudflare deployment secrets are missing; running Gemini-only validation instead."
+          else
+            echo "mode=disabled" >> "$GITHUB_OUTPUT"
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "No deployment credentials are configured; skipping workflow steps."
           fi
 
       - name: Set up Node.js
-        if: steps.cloudflare.outputs.configured == 'true'
+        if: steps.config.outputs.mode != 'disabled'
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
       - name: Install backend dependencies
-        if: steps.cloudflare.outputs.configured == 'true'
+        if: steps.config.outputs.mode != 'disabled'
         working-directory: backend/legal-ai
         run: npm install
 
       - name: Typecheck
-        if: steps.cloudflare.outputs.configured == 'true'
+        if: steps.config.outputs.mode != 'disabled'
         working-directory: backend/legal-ai
         run: npm run typecheck
 
+      - name: Validate Gemini API directly
+        if: steps.config.outputs.mode == 'gemini-only'
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          curl --fail --silent --show-error --location \
+            -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}" \
+            -H 'Content-Type: application/json' \
+            -d '{"contents":[{"parts":[{"text":"Reply in Arabic with JSON {\"status\":\"ok\",\"provider\":\"gemini-direct\"}"}]}]}' \
+            | python3 -c 'import sys, json; data=json.load(sys.stdin); print(data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", ""));'
+
       - name: Ensure Vectorize index
-        if: steps.cloudflare.outputs.configured == 'true'
+        if: steps.config.outputs.mode == 'cloudflare'
         working-directory: backend/legal-ai
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -65,7 +80,7 @@ jobs:
           fi
 
       - name: Apply D1 schema
-        if: steps.cloudflare.outputs.configured == 'true'
+        if: steps.config.outputs.mode == 'cloudflare'
         working-directory: backend/legal-ai
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -73,7 +88,7 @@ jobs:
         run: npx wrangler d1 execute yemen_laws_db --remote --file=./schema.sql
 
       - name: Generate D1 seed from canonical SQLite database
-        if: steps.cloudflare.outputs.configured == 'true'
+        if: steps.config.outputs.mode == 'cloudflare'
         working-directory: backend/legal-ai
         run: |
           rm -rf data/generated
@@ -83,7 +98,7 @@ jobs:
             --out ./data/generated
 
       - name: Import legal corpus to D1
-        if: steps.cloudflare.outputs.configured == 'true'
+        if: steps.config.outputs.mode == 'cloudflare'
         working-directory: backend/legal-ai
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -91,7 +106,7 @@ jobs:
         run: npx wrangler d1 execute yemen_laws_db --remote --file=./data/generated/seed.sql
 
       - name: Configure Gemini API secret
-        if: steps.cloudflare.outputs.configured == 'true'
+        if: steps.config.outputs.mode == 'cloudflare'
         working-directory: backend/legal-ai
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -100,7 +115,7 @@ jobs:
         run: printf '%s' "$GEMINI_API_KEY" | npx wrangler secret put GEMINI_API_KEY
 
       - name: Deploy Worker
-        if: steps.cloudflare.outputs.configured == 'true'
+        if: steps.config.outputs.mode == 'cloudflare'
         working-directory: backend/legal-ai
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -108,7 +123,7 @@ jobs:
         run: npx wrangler deploy
 
       - name: Semantic reindex legal corpus
-        if: steps.cloudflare.outputs.configured == 'true'
+        if: steps.config.outputs.mode == 'cloudflare'
         working-directory: backend/legal-ai
         env:
           LEGAL_AI_BASE_URL: https://odd-mouse-c1e0.ghgfcrcgrf57566.workers.dev
@@ -119,8 +134,9 @@ jobs:
             exit 0
           fi
           bash scripts/reindex.sh
+
       - name: Verify Legal AI endpoints
-        if: steps.cloudflare.outputs.configured == 'true'
+        if: steps.config.outputs.mode == 'cloudflare'
         env:
           LEGAL_AI_BASE_URL: https://odd-mouse-c1e0.ghgfcrcgrf57566.workers.dev
           APP_VERSION: 1.0.0
