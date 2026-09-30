@@ -89,6 +89,7 @@ export default {
       return json({
         ok: true,
         response_source: "local_rag_with_web_fallback",
+        gemini_configured: Boolean(env.GEMINI_API_KEY?.trim()),
       });
     }
 
