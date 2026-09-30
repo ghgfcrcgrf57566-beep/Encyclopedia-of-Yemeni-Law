@@ -21,29 +21,60 @@ class _LegalAiScreenState extends State<LegalAiScreen> {
   @override void dispose(){c.dispose();scroll.dispose();super.dispose();}
 
   Future<void> ask() async {
-    if(loading) return;
-    final q=c.text.trim();
-    if(q.isEmpty)return;
+    if (loading) return;
+    final q = c.text.trim();
+    if (q.isEmpty) return;
+    await _sendQuestion(q, addUserMessage: true);
+  }
+
+  Future<void> _retry(String q) async {
+    if (loading || q.trim().isEmpty) return;
+    await _sendQuestion(q.trim(), addUserMessage: false);
+  }
+
+  Future<void> _sendQuestion(
+    String q, {
+    required bool addUserMessage,
+  }) async {
     final previousMessages = messages
-        .where((m)=>m.role=='user'||m.role=='assistant')
+        .where((m) => m.role == 'user' || m.role == 'assistant')
         .toList();
     final recentMessages = previousMessages.length > 12
         ? previousMessages.skip(previousMessages.length - 12)
         : previousMessages;
-    final history=recentMessages
-        .map((m)=>{'role':m.role,'content':m.text})
+    final history = recentMessages
+        .map((m) => {'role': m.role, 'content': m.text})
         .toList();
 
-    setState((){messages.add(_Msg.user(q));c.clear();loading=true;});
+    setState(() {
+      if (addUserMessage) {
+        messages.add(_Msg.user(q));
+        c.clear();
+      } else {
+        final index = messages.lastIndexWhere((m) => m.role == 'error');
+        if (index != -1) messages.removeAt(index);
+      }
+      loading = true;
+    });
     _end();
-    try{
-      final r=await service.ask(question:q,conversationId:conversationId,history:history);
+
+    try {
+      final r = await service.ask(
+        question: q,
+        conversationId: conversationId,
+        history: history,
+      );
       conversationId ??= r.conversationId;
-      if(mounted)setState(()=>messages.add(_Msg.answer(r)));
-    }catch(e){
-      if(mounted)setState(()=>messages.add(_Msg.error(e.toString())));
-    }finally{
-      if(mounted){setState(()=>loading=false);_end();}
+      if (mounted) setState(() => messages.add(_Msg.answer(r)));
+    } catch (e) {
+      if (mounted) {
+        setState(() => messages.add(_Msg.error(e.toString(), q)));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => loading = false);
+        _end();
+      }
     }
   }
 
@@ -167,7 +198,7 @@ class _LegalAiScreenState extends State<LegalAiScreen> {
       if(messages.isEmpty)_Intro(),
       Expanded(child:messages.isEmpty
         ?_Empty(onTap:(q){c.text=q;ask();})
-        :ListView.builder(controller:scroll,padding:const EdgeInsets.all(14),itemCount:messages.length,itemBuilder:(_,i)=>_Message(m:messages[i]))),
+        :ListView.builder(controller:scroll,padding:const EdgeInsets.all(14),itemCount:messages.length,itemBuilder:(_,i)=>_Message(m:messages[i],onRetry:messages[i].retryQuestion==null?null:()=>_retry(messages[i].retryQuestion!)))),
       if(loading)
         Padding(
           padding:const EdgeInsets.symmetric(horizontal:14,vertical:5),
@@ -225,15 +256,17 @@ class _Empty extends StatelessWidget{
 }
 
 class _Msg{
-  final String role,text; final LegalAiResult? result;
-  const _Msg(this.role,this.text,this.result);
-  factory _Msg.user(String t)=>_Msg('user',t,null);
-  factory _Msg.answer(LegalAiResult r)=>_Msg('assistant',r.answer,r);
-  factory _Msg.error(String t)=>_Msg('error',t,null);
+  final String role,text; final LegalAiResult? result; final String? retryQuestion;
+  const _Msg(this.role,this.text,this.result,this.retryQuestion);
+  factory _Msg.user(String t)=>_Msg('user',t,null,null);
+  factory _Msg.answer(LegalAiResult r)=>_Msg('assistant',r.answer,r,null);
+  factory _Msg.error(String t,String q)=>_Msg('error',t,null,q);
 }
 
 class _Message extends StatelessWidget{
-  final _Msg m; const _Message({required this.m});
+  final _Msg m;
+  final VoidCallback? onRetry;
+  const _Message({required this.m,this.onRetry});
   @override Widget build(BuildContext context){
     final user=m.role=='user',err=m.role=='error';
     return Align(
@@ -253,24 +286,18 @@ class _Message extends StatelessWidget{
           ]),
           const SizedBox(height:7),
           SelectableText(m.text,textAlign:TextAlign.right,style:TextStyle(color:context.textPrimary,height:1.7)),
-          if(m.result!=null)...[
-            const SizedBox(height:12),
+          if(m.role=='error' && onRetry!=null)...[
+            const SizedBox(height:10),
             Align(
               alignment: Alignment.centerRight,
-              child: Text(
-                m.result!.responseSource == 'local_db'
-                    ? 'المصدر: قاعدة القوانين المحلية'
-                    : m.result!.responseSource == 'local_db_gemini'
-                        ? 'المصدر: قاعدة القوانين المحلية + المساعد الذكي'
-                        : 'المصدر: المساعد الذكي (احتياطي)',
-                textAlign: TextAlign.right,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: context.textSecondary,
-                ),
+              child: OutlinedButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('إعادة الإرسال'),
               ),
             ),
+          ],
+          if(m.result!=null)...[
             if(m.result!.sources.isNotEmpty)...[
               const SizedBox(height:16),
               Text('المواد القانونية المستخدمة',textAlign:TextAlign.right,style:TextStyle(fontWeight:FontWeight.w900,color:context.textPrimary)),
