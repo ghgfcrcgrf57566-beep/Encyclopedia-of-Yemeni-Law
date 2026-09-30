@@ -151,13 +151,19 @@ class LegalAiService {
     if (matches.length == 1) {
       final m = matches.first;
       final law = m.lawName?.trim();
-      final lawText = law == null || law.isEmpty ? '' : ' — $' + '{law}';
-      return 'وجدت في قاعدة القوانين المحلية المادة ($' + '{m.number})$' +
-          '{lawText}:\n\n$' + '{m.body.trim()}';
+      final lawText = law == null || law.isEmpty ? '' : ' — ' + law;
+      return 'وجدت في قاعدة القوانين المحلية المادة (' +
+          m.number +
+          ')' +
+          lawText +
+          ':\n\n' +
+          m.body.trim();
     }
 
     final buffer = StringBuffer(
-      'وجدت $' + '{matches.length} مواد مرتبطة بسؤالك في قاعدة القوانين المحلية:\n',
+      'وجدت ' +
+          matches.length.toString() +
+          ' مواد مرتبطة بسؤالك في قاعدة القوانين المحلية:\n',
     );
 
     for (var i = 0; i < matches.length; i++) {
@@ -165,9 +171,9 @@ class LegalAiService {
       final law = m.lawName?.trim();
 
       buffer
-        ..write('\n$' + '{i + 1}. المادة ($' + '{m.number})')
-        ..write(law == null || law.isEmpty ? '' : ' — $' + '{law}')
-        ..write('\n$' + '{m.body.trim()}\n');
+        ..write('\n' + (i + 1).toString() + '. المادة (' + m.number + ')')
+        ..write(law == null || law.isEmpty ? '' : ' — ' + law)
+        ..write('\n' + m.body.trim() + '\n');
     }
 
     return buffer.toString().trim();
