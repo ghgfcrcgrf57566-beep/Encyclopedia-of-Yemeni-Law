@@ -260,7 +260,9 @@ class _Message extends StatelessWidget{
               child: Text(
                 m.result!.responseSource == 'local_db'
                     ? 'المصدر: قاعدة القوانين المحلية'
-                    : 'المصدر: المساعد الذكي (احتياطي)',
+                    : m.result!.responseSource == 'local_db_gemini'
+                        ? 'المصدر: قاعدة القوانين المحلية + المساعد الذكي'
+                        : 'المصدر: المساعد الذكي (احتياطي)',
                 textAlign: TextAlign.right,
                 style: TextStyle(
                   fontSize: 11,
