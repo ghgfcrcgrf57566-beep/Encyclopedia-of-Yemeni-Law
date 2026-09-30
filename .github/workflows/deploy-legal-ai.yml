@@ -7,6 +7,7 @@ on:
       - "backend/legal-ai/**"
       - "yemen_laws_app/tools/export_rag_data.py"
       - "yemen_laws_app/assets/db/app_database.db"
+      - ".github/workflows/deploy-legal-ai.yml"
   workflow_dispatch:
 
 jobs:
