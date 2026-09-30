@@ -55,6 +55,12 @@ LAW_ORDER = [
     ("قانون_مزاولة_المهن_الطبية.docx", "قانون مزاولة المهن الطبية والصيدلانية", "المهن الطبية", "إداري"),
     ("قانون_تنظيم_العلاقة_بين_المؤجر_والمستأجر__2021م.docx",
      "قانون تنظيم العلاقة بين المؤجر والمستأجر", "المؤجر والمستأجر", "مدني"),
+    # --- إضافات لاحقة (بعد الدفعة الأولى المكوّنة من 15 قانونًا) ---
+    ("قانون_المرور_اليمني.docx", "قانون المرور اليمني", "المرور", "مرور"),
+    ("قانون_الوقف_الشرعي.docx", "قانون الوقف الشرعي", "الوقف الشرعي", "وقف"),
+    ("قانون_تنظيم_السجون.docx", "قانون تنظيم مصلحة السجون", "السجون", "جزائي"),
+    ("قانون_تنظيم_مهنة_المحاماة.docx", "قانون تنظيم مهنة المحاماة", "المحاماة", "إداري"),
+    ("قانون_اراضي_وعقارات_الدولة.docx", "قانون أراضي وعقارات الدولة", "أراضي وعقارات الدولة", "مدني"),
 ]
 
 HEADING_PATTERNS = [
@@ -86,7 +92,7 @@ def read_file_text(path: str) -> str:
     if zipfile.is_zipfile(path):
         try:
             out = subprocess.run(
-                ["pandoc", "-t", "plain", path],
+                ["pandoc", "-t", "plain", "--wrap=none", path],
                 capture_output=True, text=True, check=True
             )
             return out.stdout
@@ -102,12 +108,19 @@ def split_paragraphs(text: str):
 
 
 def match_heading(p: str):
-    """يعيد (level, level_name, label, inline_title) إن كانت الفقرة عنوانًا."""
+    """يعيد (level, level_name, label, inline_title) إن كانت الفقرة عنوانًا.
+
+    ملاحظة مهمة: بعض القوانين تستخدم كلمات مثل "القسم" أو "الفصل" كمصطلح
+    مُعرَّف داخل مادة التعريفات، وهذا ليس عنوان تقسيم فعليًا.
+    """
     if len(p) > 90 or "ماد" in p[:6]:
         return None
     for rx, level, name in HEADING_PATTERNS:
         m = rx.match(p)
         if m:
+            rest = p[m.end(1):].strip()
+            if rest and not rest.startswith("ال") and not rest.startswith("تمهيدي"):
+                continue
             label = p
             title = None
             if ":" in p:
@@ -117,6 +130,9 @@ def match_heading(p: str):
             return level, name, label, title
     return None
 
+
+# يبحث عن "مادة(رقم)" في أي موضع من الفقرة.
+INLINE_ARTICLE_SEARCH = re.compile(r"(?:ال)?ماد[ةه]\s*\(\s*\d+(?:\s*مكرر)?\s*\)")
 
 def parse_law(text: str):
     """
@@ -180,6 +196,23 @@ def parse_law(text: str):
         if not started:
             i += 1
             continue
+
+        # حالة نادرة: عنوان فرعي التصق بأول مادة في نفس الفقرة.
+        inline = INLINE_ARTICLE_SEARCH.search(p)
+        if inline:
+            article_part = p[inline.start():]
+            art2 = ARTICLE_PATTERN.match(article_part)
+            if art2:
+                number = art2.group(1).strip()
+                body_lines = [art2.group(2).strip()]
+                j = i + 1
+                while j < n and not match_heading(paragraphs[j]) and not ARTICLE_PATTERN.match(paragraphs[j]):
+                    body_lines.append(paragraphs[j])
+                    j += 1
+                body = "\n".join([b for b in body_lines if b]).strip()
+                stack[-1]["articles"].append({"number": number, "body": body})
+                i = j
+                continue
 
         # فقرة نصية لم تُلتقط (نادر) - ألحقها بآخر مادة إن وجدت
         target = stack[-1]
