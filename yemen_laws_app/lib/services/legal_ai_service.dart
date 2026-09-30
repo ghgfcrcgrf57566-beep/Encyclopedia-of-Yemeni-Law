@@ -121,10 +121,6 @@ class LegalAiService {
         'لم يتم إعداد مفتاح المساعد الذكي. ابنِ التطبيق باستخدام GEMINI_API_KEY.',
       );
     }
-      throw const LegalAiException(
-        'لم يتم إعداد مفتاح المساعد الذكي. ابنِ التطبيق باستخدام GEMINI_API_KEY.',
-      );
-    }
 
     try {
       final result = await _askGemini(
