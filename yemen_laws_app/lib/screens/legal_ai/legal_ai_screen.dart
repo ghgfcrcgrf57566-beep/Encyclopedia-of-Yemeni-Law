@@ -259,8 +259,8 @@ class _Message extends StatelessWidget{
               alignment: Alignment.centerRight,
               child: Text(
                 m.result!.responseSource == 'local_db'
-                    ? 'المصدر: نصوص الموسوعة + تحليل الذكاء الاصطناعي'
-                    : 'المصدر: بحث الويب عبر الذكاء الاصطناعي (احتياطي)',
+                    ? 'المصدر: قاعدة القوانين المحلية'
+                    : 'المصدر: المساعد الذكي (احتياطي)',
                 textAlign: TextAlign.right,
                 style: TextStyle(
                   fontSize: 11,
