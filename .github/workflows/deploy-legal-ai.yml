@@ -24,16 +24,14 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
-            if [ -n "$GEMINI_API_KEY" ]; then
-              echo "configured=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "configured=false" >> "$GITHUB_OUTPUT"
-              echo "GEMINI_API_KEY GitHub secret is not configured; deployment is skipped."
-            fi
+          echo "cloudflare_token_present=$([ -n "$CLOUDFLARE_API_TOKEN" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "cloudflare_account_present=$([ -n "$CLOUDFLARE_ACCOUNT_ID" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "gemini_key_present=$([ -n "$GEMINI_API_KEY" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ] && [ -n "$GEMINI_API_KEY" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
           else
             echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "Cloudflare secrets are not configured; deployment is skipped."
+            echo "Required deployment secrets are incomplete; deployment is skipped."
           fi
 
       - name: Set up Node.js
