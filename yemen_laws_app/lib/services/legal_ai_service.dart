@@ -287,10 +287,17 @@ class LegalAiService {
         if (!_isTemporaryGeminiFailure(response.statusCode, body) ||
             attempt == retryDelays.length) {
           final apiMessage = _extractApiError(body);
+          final isQuotaExceeded = _isGeminiQuotaExceeded(
+            response.statusCode,
+            body,
+          );
+
           throw LegalAiException(
-            _isTemporaryGeminiFailure(response.statusCode, body)
-                ? 'الخدمة مشغولة حالياً. تمت إعادة المحاولة تلقائياً، ويرجى المحاولة بعد قليل إذا استمر الخطأ.'
-                : (apiMessage ?? _status(response.statusCode)),
+            isQuotaExceeded
+                ? 'تم تجاوز الحد المتاح حالياً لخدمة المساعد. يرجى المحاولة لاحقاً.'
+                : _isTemporaryGeminiFailure(response.statusCode, body)
+                    ? 'الخدمة مشغولة حالياً. تمت إعادة المحاولة تلقائياً، ويرجى المحاولة بعد قليل إذا استمر الخطأ.'
+                    : (apiMessage ?? _status(response.statusCode)),
           );
         }
       } catch (e) {
@@ -381,13 +388,41 @@ class LegalAiService {
     int statusCode,
     Map<String, dynamic> body,
   ) {
-    if ({429, 500, 502, 503, 504}.contains(statusCode)) return true;
-
     final message = _extractApiError(body)?.toLowerCase() ?? '';
+
+    // 429 قد يعني ضغطاً مؤقتاً أو نفاد الحصة. لا نعيد المحاولة
+    // تلقائياً عند نفاد الحصة لأن الانتظار لبضع ثوانٍ لن يحل المشكلة.
+    if (statusCode == 429) {
+      final quotaExceeded = message.contains('quota exceeded') ||
+          message.contains('quota') ||
+          message.contains('free_tier_requests') ||
+          message.contains('rate limit');
+      if (quotaExceeded) return false;
+
+      return true;
+    }
+
+    if ({500, 502, 503, 504}.contains(statusCode)) return true;
+
     return message.contains('high demand') ||
         message.contains('overloaded') ||
         message.contains('temporarily unavailable') ||
         message.contains('temporarily busy');
+  }
+
+  bool _isGeminiQuotaExceeded(
+    int statusCode,
+    Map<String, dynamic> body,
+  ) {
+    if (statusCode == 429) {
+      final message = _extractApiError(body)?.toLowerCase() ?? '';
+      return message.contains('quota exceeded') ||
+          message.contains('quota') ||
+          message.contains('free_tier_requests') ||
+          message.contains('rate limit');
+    }
+
+    return false;
   }
 
   String? _extractApiError(Map<String, dynamic> body) {
