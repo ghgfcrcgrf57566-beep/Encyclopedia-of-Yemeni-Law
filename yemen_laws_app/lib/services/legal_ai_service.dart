@@ -185,7 +185,7 @@ class LegalAiService {
     List<Madda> localMatches = const [],
   }) async {
     final model = AppConfig.geminiModel.trim().isEmpty
-        ? 'gemini-3.8-flash'
+        ? 'gemini-3.5-flash-lite'
         : AppConfig.geminiModel.trim();
 
     final uri = Uri.parse(
