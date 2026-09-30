@@ -101,24 +101,26 @@ class LegalAiService {
       limit: 8,
     );
 
-    if (localMatches.isNotEmpty) {
-      final result = LegalAiResult(
-        answer: _buildLocalAnswer(localMatches),
-        sources: localMatches.map(LegalAiSource.fromMadda).toList(),
-        conversationId: conversationId,
-        responseSource: 'local_db',
-      );
-
-      await _saveHistorySafely(
-        query: q,
-        response: result.answer,
-        source: result.responseSource,
-      );
-
-      return result;
-    }
-
     if (AppConfig.geminiApiKey.trim().isEmpty) {
+      if (localMatches.isNotEmpty) {
+        final result = LegalAiResult(
+          answer: _buildLocalAnswer(localMatches),
+          sources: localMatches.map(LegalAiSource.fromMadda).toList(),
+          conversationId: conversationId,
+          responseSource: 'local_db',
+        );
+        await _saveHistorySafely(
+          query: q,
+          response: result.answer,
+          source: result.responseSource,
+        );
+        return result;
+      }
+
+      throw const LegalAiException(
+        'لم يتم إعداد مفتاح المساعد الذكي. ابنِ التطبيق باستخدام GEMINI_API_KEY.',
+      );
+    }
       throw const LegalAiException(
         'لم يتم إعداد مفتاح المساعد الذكي. ابنِ التطبيق باستخدام GEMINI_API_KEY.',
       );
@@ -129,6 +131,7 @@ class LegalAiService {
         question: q,
         conversationId: conversationId,
         history: history,
+        localMatches: localMatches,
       );
 
       await _saveHistorySafely(
@@ -183,6 +186,7 @@ class LegalAiService {
     required String question,
     String? conversationId,
     required List<Map<String, String>> history,
+    List<Madda> localMatches = const [],
   }) async {
     final model = AppConfig.geminiModel.trim().isEmpty
         ? 'gemini-3.8-flash'
@@ -208,10 +212,18 @@ class LegalAiService {
       });
     }
 
+    final localContext = _buildLocalContext(localMatches);
+
     contents.add({
       'role': 'user',
       'parts': [
-        {'text': question},
+        {
+          'text': localContext.isEmpty
+              ? question
+              : 'السؤال:\n$question\n\n'
+                  'المواد المستخرجة من قاعدة القوانين المحلية:\n'
+                  '$localContext',
+        },
       ],
     });
 
@@ -231,10 +243,13 @@ class LegalAiService {
 أنت المساعد الذكي داخل تطبيق «موسوعة القوانين اليمنية».
 أجب باللغة العربية وبأسلوب قانوني واضح ومتحفظ.
 
-قاعدة مهمة:
-- قاعدة البيانات القانونية المحلية هي المصدر الأول.
-- لم يجد البحث المحلي مادة مناسبة لهذا السؤال.
-- لا تخترع أرقام مواد أو نصوص قوانين أو أحكاماً قضائية.
+قواعد الإجابة:
+- قاعدة البيانات القانونية المحلية هي المصدر القانوني الأساسي.
+- إذا أُرفقت مواد مستخرجة من قاعدة القوانين المحلية، فاعتمد عليها كأساس للإجابة والتحليل.
+- لا تغيّر نص المادة ولا تنسب إليها نصاً غير موجود.
+- عند الاستشهاد، اذكر اسم القانون ورقم المادة.
+- فرّق بوضوح بين «النص القانوني» و«التحليل والشرح».
+- إذا كانت المواد المحلية لا تكفي للإجابة، اذكر حدودها ولا تخترع حكماً قانونياً.
 - إذا لم تكن متأكداً من نص قانوني محدد، صرّح بذلك بوضوح.
 - ميّز بين المعلومة العامة وبين النص القانوني الملزم.
 - لا تدّعِ أن إجابتك فتوى أو حكم قضائي ملزم.
@@ -271,10 +286,39 @@ class LegalAiService {
 
     return LegalAiResult(
       answer: answer,
-      sources: const [],
+      sources: localMatches.map(LegalAiSource.fromMadda).toList(),
       conversationId: conversationId,
-      responseSource: 'gemini_ai',
+      responseSource: localMatches.isEmpty ? 'gemini_ai' : 'local_db_gemini',
     );
+  }
+
+  String _buildLocalContext(List<Madda> matches) {
+    if (matches.isEmpty) return '';
+
+    final buffer = StringBuffer();
+
+    for (var i = 0; i < matches.length; i++) {
+      final m = matches[i];
+      buffer
+        ..writeln('[المصدر ${i + 1}]')
+        ..writeln('القانون: ${m.lawName?.trim().isNotEmpty == true ? m.lawName!.trim() : 'القوانين اليمنية'}')
+        ..writeln('المادة: ${m.number}')
+        ..writeln('النص:')
+        ..writeln(m.body.trim());
+
+      final context = [
+        if (m.babLabel?.trim().isNotEmpty == true) m.babLabel!.trim(),
+        if (m.faslLabel?.trim().isNotEmpty == true) m.faslLabel!.trim(),
+      ].join(' - ');
+
+      if (context.isNotEmpty) {
+        buffer.writeln('السياق: $context');
+      }
+
+      buffer.writeln();
+    }
+
+    return buffer.toString().trim();
   }
 
   String _extractGeneratedText(Map<String, dynamic> body) {
