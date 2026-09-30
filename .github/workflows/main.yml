@@ -53,22 +53,6 @@ jobs:
       - name: Generate Android launcher icons
         run: dart run flutter_launcher_icons
 
-      - name: Resolve LEGAL_AI_BASE_URL
-        env:
-          SECRET_LEGAL_AI_BASE_URL: ${{ secrets.LEGAL_AI_BASE_URL }}
-        run: |
-          set -e
-          if [ -n "$SECRET_LEGAL_AI_BASE_URL" ]; then
-            LEGAL_AI_BASE_URL="$SECRET_LEGAL_AI_BASE_URL"
-          else
-            LEGAL_AI_BASE_URL="https://odd-mouse-c1e0.ghgfcrcgrf57566.workers.dev"
-          fi
-          case "$LEGAL_AI_BASE_URL" in
-            https://*) ;;
-            *) echo "LEGAL_AI_BASE_URL must start with https://"; exit 1 ;;
-          esac
-          echo "LEGAL_AI_BASE_URL=$LEGAL_AI_BASE_URL" >> "$GITHUB_ENV"
-
       - name: Run Flutter tests
         run: |
           if [ -d test ]; then
@@ -77,14 +61,10 @@ jobs:
             echo "No Flutter test directory found; skipping flutter test."
           fi
 
-      - name: Check backend TypeScript
-        working-directory: backend/legal-ai
-        run: |
-          npm install
-          npm run typecheck
-
       - name: Build release APK
-        run: flutter build apk --release --dart-define=LEGAL_AI_BASE_URL="$LEGAL_AI_BASE_URL"
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: flutter build apk --release --dart-define=GEMINI_API_KEY="$GEMINI_API_KEY" --dart-define=APP_VERSION=1.0.0
 
       - name: Check if Supreme Court PDF release exists
         env:
