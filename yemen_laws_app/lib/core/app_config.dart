@@ -8,7 +8,7 @@ class AppConfig {
 
   static const geminiModel = String.fromEnvironment(
     'GEMINI_MODEL',
-    defaultValue: 'gemini-3.8-flash',
+    defaultValue: 'gemini-3.5-flash-lite',
   );
 
   static const appVersion = String.fromEnvironment(
