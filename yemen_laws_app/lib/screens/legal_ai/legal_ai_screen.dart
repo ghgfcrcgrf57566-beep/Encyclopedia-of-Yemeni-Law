@@ -505,7 +505,7 @@ class _Source extends StatelessWidget {
     onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ArticleDetailScreen(maddaId: s.articleId))),
     child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
       Text(s.lawName, textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w800, color: context.accent)),
-      if (s.reference != null && s.reference!.trim().isNotEmpty) ...[const SizedBox(height: 4), Text(s.reference!, textAlign: TextAlign.right, style: TextStyle(color: context.textSecondary, fontSize: 11))],
+      if (s.reference.trim().isNotEmpty) ...[const SizedBox(height: 4), Text(s.reference, textAlign: TextAlign.right, style: TextStyle(color: context.textSecondary, fontSize: 11))],
       const SizedBox(height: 4),
       Text('المادة: ${s.articleNumber}', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w700, color: context.textPrimary)),
       const SizedBox(height: 7),
