@@ -175,8 +175,9 @@ class _SupremeCourtScreenState extends State<SupremeCourtScreen> {
       void Function(void Function()) sheetSetState, BuildContext sheetContext) async {
     final file = await _localFile(book);
     if (await file.exists()) {
+      if (!sheetContext.mounted) return;
       Navigator.pop(sheetContext);
-      _openPdf(file.path, '${book['title'] ?? ''}');
+      if (mounted) _openPdf(file.path, '${book['title'] ?? ''}');
       return;
     }
     final url = '${book['download_url'] ?? ''}'.trim();
@@ -200,9 +201,9 @@ class _SupremeCourtScreenState extends State<SupremeCourtScreen> {
       if (await file.exists()) await file.delete();
       await temp.rename(file.path);
       _downloaded.add(_safeFileName('${book['file_name'] ?? book['id']}'));
-      if (!mounted) return;
+      if (!sheetContext.mounted) return;
       Navigator.pop(sheetContext);
-      _openPdf(file.path, '${book['title'] ?? ''}');
+      if (mounted) _openPdf(file.path, '${book['title'] ?? ''}');
     } catch (_) {
       if (await temp.exists()) await temp.delete();
       _showMessage('تعذر تنزيل الملف. تأكد من الاتصال بالإنترنت.');
@@ -625,7 +626,7 @@ class _SupremeCourtPdfViewerState extends State<SupremeCourtPdfViewer> {
           if (_error != null) Align(alignment: Alignment.topCenter,
             child: Container(margin: const EdgeInsets.all(12), padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(color: const Color(0xEE2A1515), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0x88D58D8D))),
-              child: Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white))),
+              child: Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white)))),
         ],
       ),
     );
