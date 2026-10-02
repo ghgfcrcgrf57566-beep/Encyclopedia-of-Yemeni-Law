@@ -25,7 +25,8 @@ dependencies:
   share_plus: ^9.0.0
 
   # الإملاء الصوتي
-  speech_to_text: ^7.0.0
+  # الإصدار 6.6.2 متوافق مع web 0.5 المستخدم بواسطة share_plus 9.x
+  speech_to_text: ^6.6.2
 
   # حفظ تفضيلات المستخدم محليًا
   shared_preferences: ^2.2.3
