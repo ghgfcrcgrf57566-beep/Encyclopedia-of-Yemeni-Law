@@ -619,14 +619,28 @@ class _SupremeCourtPdfViewerState extends State<SupremeCourtPdfViewer> {
             child: IgnorePointer(child: Center(child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
               decoration: BoxDecoration(color: const Color(0xDD1A1A1A), borderRadius: BorderRadius.circular(99), border: Border.all(color: _gold.withValues(alpha: 0.55))),
-              child: Text(_pages == null ? 'جاري تحميل الصفحات...' : 'صفحة ${_page + 1} من ${_pages}',
+              child: Text(_pages == null ? 'جاري تحميل الصفحات...' : 'صفحة ${_page + 1} من $_pages',
                 style: const TextStyle(color: _goldLight, fontSize: 12, fontWeight: FontWeight.w700)),
             ))),
           ),
-          if (_error != null) Align(alignment: Alignment.topCenter,
-            child: Container(margin: const EdgeInsets.all(12), padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: const Color(0xEE2A1515), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0x88D58D8D))),
-              child: Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white)))),
+          if (_error != null)
+            Align(
+              alignment: Alignment.topCenter,
+              child: Container(
+                margin: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xEE2A1515),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0x88D58D8D)),
+                ),
+                child: Text(
+                  _error!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ),
+            ),
         ],
       ),
     );
