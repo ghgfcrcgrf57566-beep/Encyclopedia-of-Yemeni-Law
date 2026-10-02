@@ -24,10 +24,13 @@ dependencies:
   # المشاركة والنسخ
   share_plus: ^9.0.0
 
-  # حفظ تفضيلات المستخدم محليًا (الوضع الليلي/النهاري، حجم الخط)
+  # الإملاء الصوتي
+  speech_to_text: ^7.0.0
+
+  # حفظ تفضيلات المستخدم محليًا
   shared_preferences: ^2.2.3
 
-  # فحص وجود اتصال بالإنترنت (لقسم الملاحظات والاقتراحات فقط)
+  # فحص وجود اتصال بالإنترنت
   connectivity_plus: ^6.0.3
 
   # الاتصال الهاتفي من شاشة التواصل
@@ -58,9 +61,7 @@ flutter:
   #     fonts:
   #       - asset: assets/fonts/Cairo-Regular.ttf
   #       - asset: assets/fonts/Cairo-Bold.ttf
-  #         weight: 700
 
-# أيقونة التطبيق Android — تُولّد من الصورة الحالية داخل المستودع
 flutter_launcher_icons:
   android: true
   ios: false
