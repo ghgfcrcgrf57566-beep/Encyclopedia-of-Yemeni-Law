@@ -237,7 +237,6 @@ class LegalAiService {
   bool _isGeminiQuotaExceeded(int statusCode, Map<String, dynamic> body) { if (statusCode == 429) { final message = _extractApiError(body)?.toLowerCase() ?? ''; return message.contains('quota') || message.contains('limit'); } return false; }
   String? _extractApiError(Map<String, dynamic> body) { final error = body['error']; if (error is Map && error['message'] != null) return error['message'].toString(); return null; }
   Future<void> _saveHistorySafely({required String query, required String response, required String source}) async { try { await _historyDb.addSearch(query: query, response: response, source: source); } catch (_) {} }
-  String _status(int statusCode) { if (statusCode == 400) return 'تعذر فهم طلب المساعد. حاول صياغة السؤال بطريقة أخرى.'; if (statusCode == 401 || statusCode == 403) return 'مفتاح Gemini غير صالح أو منتهي الصلاحية.'; if (statusCode == 429) return 'وصلت إلى الحد المسموح من طلبات Gemini.'; if (statusCode >= 500) return 'الخدمة غير متاحة حالياً.'; return 'تعذر الوصول إلى المساعد الذكي.'; }
 
   static const Set<String> _assistantStopWords = {
     'ما', 'ماذا', 'هل', 'هو', 'هي', 'هذا', 'هذه', 'ذلك', 'تلك', 'من', 'في',
