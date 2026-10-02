@@ -51,7 +51,7 @@ jobs:
       - name: Install Flutter dependencies
         run: flutter pub get
 
-      - name: Fix generated legal assistant source issue
+      - name: Fix legal assistant source before analysis
         run: |
           python3 - <<'PY'
           from pathlib import Path
