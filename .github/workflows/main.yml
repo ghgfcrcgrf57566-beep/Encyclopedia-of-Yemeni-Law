@@ -29,6 +29,11 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Install Linux dependencies for GTK
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -62,7 +67,6 @@ jobs:
           PY
 
       - name: Analyze Dart code
-        # Informational lints are non-fatal; real analyzer errors still fail CI.
         run: flutter analyze --no-fatal-infos
 
       - name: Generate Android launcher icons
