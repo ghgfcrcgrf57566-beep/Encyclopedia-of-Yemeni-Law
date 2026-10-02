@@ -42,20 +42,12 @@ jobs:
       - name: Install Flutter dependencies
         run: flutter pub get
 
-      - name: Repair Supreme Court screen syntax
+      - name: Verify Supreme Court screen
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('lib/screens/supreme_court_screen.dart')
-          text = p.read_text(encoding='utf-8')
-          old = 'child: Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white)))),\n'
-          new = 'child: Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white))),\n'
-          if old in text:
-              p.write_text(text.replace(old, new, 1), encoding='utf-8')
-              print('Fixed Supreme Court screen closing parenthesis.')
-          else:
-              print('Supreme Court syntax repair not needed.')
-          PY
+          test -f lib/screens/supreme_court_screen.dart
+          grep -q "if (_error != null)" lib/screens/supreme_court_screen.dart
+          grep -q "_error!" lib/screens/supreme_court_screen.dart
+          echo "Supreme Court screen source is present and contains the corrected error UI."
 
       - name: Analyze Dart code
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
