@@ -5,6 +5,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -20,65 +23,36 @@ jobs:
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '17'
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          flutter-version: '3.47.6'
+          channel: stable
           cache: true
-
-      - name: Install Linux dependencies for GTK
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.14'
 
       - name: Create Android local.properties
         run: echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
 
-      - name: Restore Gradle wrapper
-        run: gradle -p android wrapper --gradle-version 8.14
-
-      - name: Verify Flutter project
-        run: flutter doctor -v
+      - name: Verify Flutter and Android toolchain
+        run: flutter doctor -v || true
 
       - name: Install Flutter dependencies
         run: flutter pub get
 
-      - name: Fix legal assistant source before analysis
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path('lib/services/legal_ai_service.dart')
-          text = path.read_text(encoding='utf-8')
-          old = "'جميع', 'ماهي', 'هي',"
-          new = "'جميع', 'ماهي',"
-          if old in text:
-              path.write_text(text.replace(old, new, 1), encoding='utf-8')
-              print('Removed duplicate stop-word entry: هي')
-          else:
-              print('Duplicate stop-word entry not present; no change needed.')
-          PY
+      - name: Check Dart formatting
+        run: dart format --output=none --set-exit-if-changed lib test
 
       - name: Analyze Dart code
-        run: flutter analyze --no-fatal-infos || true
+        run: flutter analyze
 
       - name: Generate Android launcher icons
         run: dart run flutter_launcher_icons
 
       - name: Run Flutter tests
-        run: |
-          if [ -d test ]; then
-            flutter test
-          else
-            echo "No Flutter test directory found; skipping flutter test."
-          fi
+        run: flutter test
 
       - name: Build release APK
         env:
@@ -88,12 +62,13 @@ jobs:
       - name: Check if Supreme Court PDF release exists
         env:
           GH_TOKEN: ${{ github.token }}
+        working-directory: ${{ github.workspace }}
         run: |
           set -e
           if gh release view v1.0.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "SC_BOOKS_VALIDATION_SKIPPED=false" >> "$GITHUB_ENV"
           else
-            echo "No GitHub release v1.0.0 is published yet for Supreme Court PDFs; skipping external URL validation until the assets exist."
+            echo "No GitHub release v1.0.0 is published yet; skipping external PDF URL validation."
             echo "SC_BOOKS_VALIDATION_SKIPPED=true" >> "$GITHUB_ENV"
           fi
 
@@ -102,6 +77,8 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           set -e
+          test -f sc_books.json
+          jq -e 'type == "array"' sc_books.json >/dev/null
           jq -r '.[].download_url' sc_books.json > /tmp/sc_book_urls.txt
           count=$(wc -l < /tmp/sc_book_urls.txt)
           if [ "$count" -ne 21 ]; then
@@ -121,8 +98,6 @@ jobs:
           if [ "$missing" -ne 0 ]; then
             echo "One or more Supreme Court PDF assets are unavailable."
             exit 1
-          else
-            echo "All Supreme Court PDF URLs are reachable."
           fi
 
       - name: Upload APK artifact
@@ -130,3 +105,4 @@ jobs:
         with:
           name: yemen-law-apk
           path: yemen_laws_app/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
