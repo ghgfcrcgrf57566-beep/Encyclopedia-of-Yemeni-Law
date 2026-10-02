@@ -25,8 +25,8 @@ dependencies:
   share_plus: ^9.0.0
 
   # الإملاء الصوتي
-  # الإصدار 6.6.2 متوافق مع web 0.5 المستخدم بواسطة share_plus 9.x
-  speech_to_text: ^6.6.2
+  # تم تحديث الإصدار إلى 7.x لأنه متوافق مع Flutter 3.47 وأيضًا مع Android API الحديثة
+  speech_to_text: ^7.0.0
 
   # حفظ تفضيلات المستخدم محليًا
   shared_preferences: ^2.2.3
