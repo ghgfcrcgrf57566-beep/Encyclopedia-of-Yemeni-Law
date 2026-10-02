@@ -3,10 +3,10 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../core/app_config.dart';
-import '../data/database_helper.dart';
-import '../models/law.dart';
-import '../models/madda.dart';
-import '../repositories/laws_repository.dart';
+import '../data/models/law.dart';
+import '../data/models/madda.dart';
+import '../data/repositories/laws_repository.dart';
+import 'chat_history_db.dart';
 
 class LegalAiResult {
   final String answer;
@@ -35,15 +35,35 @@ class LegalAiSource {
     babLabel: m.babLabel,
     faslLabel: m.faslLabel,
   );
+
+  factory LegalAiSource.fromJson(Map<String, dynamic> json) {
+    final id = (json['article_id'] as num?)?.toInt() ?? (json['id'] as num?)?.toInt() ?? 0;
+    final lawName = (json['law_name'] ?? json['law'] ?? 'القوانين اليمنية').toString().trim();
+    final articleNumber = (json['article_number'] ?? json['number'] ?? '').toString().trim();
+    final body = (json['article_text'] ?? json['body'] ?? '').toString();
+    final referenceValue = (json['reference'] ?? '').toString().trim();
+    return LegalAiSource(
+      id: id,
+      articleNumber: articleNumber,
+      lawName: lawName.isEmpty ? 'القوانين اليمنية' : lawName,
+      body: body,
+      babLabel: json['bab_label']?.toString(),
+      faslLabel: json['fasl_label']?.toString(),
+    );
+  }
+
+  int get articleId => id;
+  String get articleText => body;
+  String get reference => '$lawName — المادة $articleNumber';
 }
 
 class LegalAiService {
   final LawsRepository _lawsRepository;
-  final DatabaseHelper _historyDb;
+  final ChatHistoryDb _historyDb;
 
-  LegalAiService({LawsRepository? lawsRepository, DatabaseHelper? historyDb})
-      : _lawsRepository = lawsRepository ?? LawsRepository(),
-        _historyDb = historyDb ?? DatabaseHelper.instance;
+  LegalAiService({LawsRepository? lawsRepository, ChatHistoryDb? historyDb})
+      : _lawsRepository = lawsRepository ?? LawsRepository.instance,
+        _historyDb = historyDb ?? ChatHistoryDb.instance;
 
   Future<LegalAiResult> ask({required String question, String? conversationId, List<Map<String, String>> history = const []}) async {
     final trimmed = question.trim();
