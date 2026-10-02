@@ -22,7 +22,7 @@ dependencies:
   provider: ^6.1.2
 
   # المشاركة والنسخ
-  share_plus: ^9.0.0
+  share_plus: ^13.3.1
 
   # الإملاء الصوتي
   # تم تحديث الإصدار إلى 7.x لأنه متوافق مع Flutter 3.47 وأيضًا مع Android API الحديثة
