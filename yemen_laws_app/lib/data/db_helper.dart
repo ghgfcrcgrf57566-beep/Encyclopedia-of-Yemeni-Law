@@ -13,7 +13,7 @@ import 'package:sqflite/sqflite.dart';
 /// المخزنة على جهاز المستخدم (ملاحظة: هذا يعيد أيضًا تصفير المفضلة الحالية
 /// لأنها مخزنة في نفس الملف - إن أردت الحفاظ عليها يمكن نقلها إلى قاعدة
 /// بيانات منفصلة صغيرة).
-const int dbAssetVersion = 2;
+const int dbAssetVersion = 3;
 
 class DBHelper {
   DBHelper._internal();
