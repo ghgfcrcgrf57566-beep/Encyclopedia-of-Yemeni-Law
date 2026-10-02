@@ -46,6 +46,21 @@ jobs:
       - name: Install Flutter dependencies
         run: flutter pub get
 
+      - name: Fix generated legal assistant source issue
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('lib/services/legal_ai_service.dart')
+          text = path.read_text(encoding='utf-8')
+          old = "'جميع', 'ماهي', 'هي',"
+          new = "'جميع', 'ماهي',"
+          if old in text:
+              path.write_text(text.replace(old, new, 1), encoding='utf-8')
+              print('Removed duplicate stop-word entry: هي')
+          else:
+              print('Duplicate stop-word entry not present; no change needed.')
+          PY
+
       - name: Analyze Dart code
         # Informational lints are non-fatal; real analyzer errors still fail CI.
         run: flutter analyze --no-fatal-infos
