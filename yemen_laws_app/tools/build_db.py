@@ -1,12 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
-build_db.py
--------------------------------------------------------------------
-يحوّل ملفات القوانين اليمنية إلى قاعدة بيانات SQLite واحدة.
-يدعم ملفات النص وملفات DOCX الحقيقية، ويتعامل مع المواد سواء كانت
-مفصولة بأسطر فارغة أو موجودة في أسطر متتابعة أو متلاصقة في نفس الفقرة.
--------------------------------------------------------------------
-"""
+"""build_db.py - بناء قاعدة بيانات القوانين اليمنية."""
 import argparse
 import os
 import re
@@ -50,7 +43,6 @@ HEADING_PATTERNS = [
 ARTICLE_PATTERN = re.compile(
     r"^(?:ال)?ماد[ةه]\s*\(\s*(\d+(?:\s*مكرر)?)\s*\)\s*[:\-\.]?\s*(.*)$"
 )
-
 ARTICLE_START_PATTERN = re.compile(
     r"(?:^|\s)(?:ال)?ماد[ةه]\s*\(\s*\d+(?:\s*مكرر)?\s*\)"
 )
@@ -70,17 +62,18 @@ def normalize_spaces(text: str) -> str:
 
 def strip_markdown(p: str) -> str:
     p = p.strip()
-    p = re.sub(r"^\*\*(.*)\*\*$", r"\1", p.strip())
+    p = re.sub(r"^\*\*(.*)\*\*$", r"\1", p)
     return p.strip()
 
 
 def read_file_text(path: str) -> str:
-    """يقرأ الملف كنص عادي، أو يستخرجه بـ pandoc إن كان DOCX حقيقيًا."""
     if zipfile.is_zipfile(path):
         try:
             out = subprocess.run(
                 ["pandoc", "-t", "plain", "--wrap=none", path],
-                capture_output=True, text=True, check=True
+                capture_output=True,
+                text=True,
+                check=True,
             )
             return out.stdout
         except Exception as e:
@@ -90,22 +83,14 @@ def read_file_text(path: str) -> str:
 
 
 def split_paragraphs(text: str):
-    """
-    تقسيم النص إلى وحدات تحليل حقيقية.
-
-    السبب: بعض ملفات Word لا تضع سطرًا فارغًا بين المواد، ولذلك كان
-    المحلل القديم يرى عدة مواد كفقرة واحدة. هنا نفصل أيضًا عند بداية
-    مادة أو عنوان معروف حتى لو لم يوجد سطر فارغ.
-    """
-    text = clean_text(text)
-    lines = text.split("\n")
+    """يفصل الفقرات والمواد والعناوين حتى بدون أسطر فارغة بين المواد."""
+    lines = clean_text(text).split("\n")
     parts = []
     buffer = []
 
     def flush():
         if buffer:
-            value = normalize_spaces(" ".join(buffer))
-            value = strip_markdown(value)
+            value = strip_markdown(normalize_spaces(" ".join(buffer)))
             if value:
                 parts.append(value)
             buffer.clear()
@@ -129,11 +114,9 @@ def split_paragraphs(text: str):
 
 
 def match_heading(p: str):
-    """يعيد (level, level_name, label, inline_title) إذا كانت الفقرة عنوانًا."""
     p = normalize_spaces(p)
     if len(p) > 120 or "ماد" in p[:8]:
         return None
-
     for rx, level, name in HEADING_PATTERNS:
         m = rx.match(p)
         if m:
@@ -150,13 +133,29 @@ def match_heading(p: str):
     return None
 
 
-def parse_law(text: str):
-    """
-    يعيد شجرة العناصر (كتاب/قسم/باب/فصل) وقائمة المواد لكل قانون.
-    يدعم وجود أكثر من مادة في نفس الفقرة إذا التصقت بسبب تنسيق Word.
-    """
-    paragraphs = split_paragraphs(text)
+def append_article_chunks(target, text: str):
+    """يستخرج جميع المواد من النص، حتى إذا وجدت عدة مواد في فقرة واحدة."""
+    matches = list(ARTICLE_START_PATTERN.finditer(text))
+    if not matches:
+        return False
 
+    for index, match in enumerate(matches):
+        start = match.start()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        chunk = text[start:end].strip()
+        article = ARTICLE_PATTERN.match(chunk)
+        if not article:
+            continue
+        body = article.group(2).strip()
+        target["articles"].append({
+            "number": article.group(1).strip(),
+            "body": body,
+        })
+    return True
+
+
+def parse_law(text: str):
+    paragraphs = split_paragraphs(text)
     root = {
         "level": 0,
         "name": "root",
@@ -167,26 +166,19 @@ def parse_law(text: str):
     }
     stack = [root]
     started = False
-
     i = 0
-    n = len(paragraphs)
 
-    while i < n:
+    while i < len(paragraphs):
         p = paragraphs[i]
         heading = match_heading(p)
-        art = ARTICLE_PATTERN.match(p)
 
         if heading:
             started = True
             level, name, label, title = heading
 
-            if title is None and i + 1 < n:
+            if title is None and i + 1 < len(paragraphs):
                 nxt = paragraphs[i + 1]
-                if (
-                    not match_heading(nxt)
-                    and not ARTICLE_PATTERN.match(nxt)
-                    and len(nxt) < 120
-                ):
+                if not match_heading(nxt) and not ARTICLE_PATTERN.match(nxt) and len(nxt) < 120:
                     title = nxt
                     i += 1
 
@@ -203,62 +195,33 @@ def parse_law(text: str):
             }
             stack[-1]["children"].append(node)
             stack.append(node)
+
+            # قد يكون عنوان التقسيم ملتصقًا بالمادة الأولى.
+            if ARTICLE_START_PATTERN.search(p):
+                append_article_chunks(stack[-1], p)
             i += 1
             continue
 
-        if art:
+        article_matches = list(ARTICLE_START_PATTERN.finditer(p))
+        if article_matches:
             started = True
-            number = art.group(1).strip()
-            body_lines = [art.group(2).strip()]
-
-            j = i + 1
-            while (
-                j < n
-                and not match_heading(paragraphs[j])
-                and not ARTICLE_PATTERN.match(paragraphs[j])
-            ):
-                body_lines.append(paragraphs[j])
-                j += 1
-
-            body = "\n".join(b for b in body_lines if b).strip()
-            if body:
-                stack[-1]["articles"].append({"number": number, "body": body})
-            i = j
+            append_article_chunks(stack[-1], p)
+            i += 1
             continue
 
         if not started:
             i += 1
             continue
 
-        # إذا احتوت الفقرة على أكثر من مادة ولم تبدأ بالمادة مباشرة،
-        # استخرج جميع المواد بدل إسقاط ما بعد المادة الأولى.
-        matches = list(ARTICLE_START_PATTERN.finditer(p))
-        if matches:
-            for k, match in enumerate(matches):
-                article_start = match.start()
-                article_end = matches[k + 1].start() if k + 1 < len(matches) else len(p)
-                chunk = p[article_start:article_end].strip()
-                art2 = ARTICLE_PATTERN.match(chunk)
-                if art2:
-                    body = art2.group(2).strip()
-                    if body:
-                        stack[-1]["articles"].append({
-                            "number": art2.group(1).strip(),
-                            "body": body,
-                        })
-            i += 1
-            continue
-
-        target = stack[-1]
-        if target["articles"]:
-            target["articles"][-1]["body"] += "\n" + p
+        # النص اللاحق للمادة الحالية يُضاف إليها.
+        if stack[-1]["articles"]:
+            stack[-1]["articles"][-1]["body"] += "\n" + p
         i += 1
 
     return root
 
 
 def insert_law_tree(conn, law_id, node, parent_bab_id, current_bab_id, current_fasl_id, order_counter):
-    """يُدرج شجرة القانون والمواد بشكل تكراري."""
     cur = conn.cursor()
 
     for art in node["articles"]:
@@ -277,7 +240,6 @@ def insert_law_tree(conn, law_id, node, parent_bab_id, current_bab_id, current_f
 
     for child in node["children"]:
         order_counter[0] += 1
-
         if child["level"] in (1, 2, 3):
             cur.execute(
                 "INSERT INTO abwab (law_id, parent_bab_id, level, label, title, order_num) VALUES (?,?,?,?,?,?)",
@@ -291,16 +253,7 @@ def insert_law_tree(conn, law_id, node, parent_bab_id, current_bab_id, current_f
                 ),
             )
             new_bab_id = cur.lastrowid
-            insert_law_tree(
-                conn,
-                law_id,
-                child,
-                new_bab_id,
-                new_bab_id,
-                None,
-                order_counter,
-            )
-
+            insert_law_tree(conn, law_id, child, new_bab_id, new_bab_id, None, order_counter)
         elif child["level"] == 4:
             cur.execute(
                 "INSERT INTO fusul (law_id, bab_id, label, title, order_num) VALUES (?,?,?,?,?)",
@@ -313,15 +266,7 @@ def insert_law_tree(conn, law_id, node, parent_bab_id, current_bab_id, current_f
                 ),
             )
             new_fasl_id = cur.lastrowid
-            insert_law_tree(
-                conn,
-                law_id,
-                child,
-                parent_bab_id,
-                current_bab_id,
-                new_fasl_id,
-                order_counter,
-            )
+            insert_law_tree(conn, law_id, child, parent_bab_id, current_bab_id, new_fasl_id, order_counter)
 
 
 SCHEMA = """
@@ -333,7 +278,6 @@ CREATE TABLE laws (
     order_num INTEGER,
     articles_count INTEGER DEFAULT 0
 );
-
 CREATE TABLE abwab (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     law_id INTEGER NOT NULL REFERENCES laws(id) ON DELETE CASCADE,
@@ -343,7 +287,6 @@ CREATE TABLE abwab (
     title TEXT,
     order_num INTEGER
 );
-
 CREATE TABLE fusul (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     law_id INTEGER NOT NULL REFERENCES laws(id) ON DELETE CASCADE,
@@ -352,7 +295,6 @@ CREATE TABLE fusul (
     title TEXT,
     order_num INTEGER
 );
-
 CREATE TABLE mawad (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     law_id INTEGER NOT NULL REFERENCES laws(id) ON DELETE CASCADE,
@@ -362,14 +304,12 @@ CREATE TABLE mawad (
     body TEXT NOT NULL,
     order_num INTEGER
 );
-
 CREATE TABLE favorites (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     mada_id INTEGER NOT NULL REFERENCES mawad(id) ON DELETE CASCADE,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(mada_id)
 );
-
 CREATE TABLE article_notes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     mada_id INTEGER NOT NULL REFERENCES mawad(id) ON DELETE CASCADE,
@@ -377,34 +317,26 @@ CREATE TABLE article_notes (
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(mada_id)
 );
-
 CREATE TABLE reading_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     mada_id INTEGER NOT NULL REFERENCES mawad(id) ON DELETE CASCADE,
     opened_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
-
 CREATE TABLE search_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     query TEXT NOT NULL,
     searched_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
-
 CREATE TABLE feedback_notes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     body TEXT NOT NULL,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     sent INTEGER DEFAULT 0
 );
-
-CREATE VIRTUAL TABLE mawad_fts USING fts5(
-    body, number, content='mawad', content_rowid='id'
-);
-
+CREATE VIRTUAL TABLE mawad_fts USING fts5(body, number, content='mawad', content_rowid='id');
 CREATE TRIGGER mawad_ai AFTER INSERT ON mawad BEGIN
     INSERT INTO mawad_fts(rowid, body, number) VALUES (new.id, new.body, new.number);
 END;
-
 CREATE INDEX idx_abwab_law ON abwab(law_id);
 CREATE INDEX idx_abwab_parent ON abwab(parent_bab_id);
 CREATE INDEX idx_fusul_law ON fusul(law_id);
@@ -418,26 +350,19 @@ CREATE INDEX idx_mawad_bab ON mawad(bab_id);
 def build(src_dir: str, out_path: str):
     if os.path.exists(out_path):
         os.remove(out_path)
-
     conn = sqlite3.connect(out_path)
     conn.executescript(SCHEMA)
     conn.commit()
 
     order = 0
-
     for filename, display_name, short_name, category in LAW_ORDER:
         path = os.path.join(src_dir, filename)
-
         if not os.path.exists(path):
-            print(
-                f"تحذير: الملف غير موجود، سيتم تخطيه: {filename}",
-                file=sys.stderr,
-            )
+            print(f"تحذير: الملف غير موجود، سيتم تخطيه: {filename}", file=sys.stderr)
             continue
 
         order += 1
         print(f"[{order:02d}] معالجة: {display_name}")
-
         raw = clean_text(read_file_text(path))
         tree = parse_law(raw)
 
@@ -455,25 +380,16 @@ def build(src_dir: str, out_path: str):
 
         cur.execute("SELECT COUNT(*) FROM mawad WHERE law_id=?", (law_id,))
         count = cur.fetchone()[0]
-        cur.execute(
-            "UPDATE laws SET articles_count=? WHERE id=?",
-            (count, law_id),
-        )
+        cur.execute("UPDATE laws SET articles_count=? WHERE id=?", (count, law_id))
         conn.commit()
-
         print(f"     -> {count} مادة")
-
         if count == 0:
-            print(
-                f"     تحذير: لم يتم استخراج أي مادة من {filename}",
-                file=sys.stderr,
-            )
+            print(f"     تحذير: لم يتم استخراج أي مادة من {filename}", file=sys.stderr)
 
     conn.commit()
     conn.execute("INSERT INTO mawad_fts(mawad_fts) VALUES ('rebuild')")
     conn.commit()
     conn.close()
-
     print(f"\nتم إنشاء قاعدة البيانات: {out_path}")
 
 
