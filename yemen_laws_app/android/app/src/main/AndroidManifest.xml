@@ -1,5 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <application
         android:label="موسوعة القانون اليمني"
         android:name="${applicationName}"
@@ -13,9 +14,6 @@
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
-            <!-- يعرض شاشة البداية (splash) المُعرَّفة في launch_background.xml
-                 إلى أن يصبح فلاتر جاهزًا لرسم الواجهة، ثم يتحول تلقائيًا
-                 إلى الثيم العادي NormalTheme. -->
             <meta-data
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/NormalTheme" />
@@ -24,7 +22,6 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        <!-- ضروري لكل تطبيقات فلاتر: يفعّل نظام الإضافات (plugins) الحديث -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
