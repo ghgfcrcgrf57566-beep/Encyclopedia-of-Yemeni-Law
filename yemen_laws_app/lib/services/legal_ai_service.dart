@@ -86,7 +86,7 @@ class LegalAiService {
 
   Future<_LegalQueryPlan> _planLegalQuery(String question) async {
     final text = await _callGeminiText(
-      systemInstruction: '''أنت محلل لاستفسارات قانونية يمنية. لا تجب عن السؤال. حدد الموضوع القانوني والقانون اليمني الأكثر صلة، ثم أعد JSON فقط في هذا الشكل: {"topic":"...","law":"...","search_terms":["..."]}.''',
+      systemInstruction: '''أنت محلل لاستفسارات قانونية يمنية. لا تجب عن السؤال. حدد الموضوع القانوني والقانون اليمني ال[...]
       userText: question,
     );
     final json = _extractJsonObject(text);
@@ -112,7 +112,7 @@ class LegalAiService {
     }
     for (final term in plan.searchTerms) { await addResults(term); if (candidates.length >= 24) break; }
     if (candidates.isEmpty && lawId != null) await addResults(plan.topic);
-    if (candidates.isEmpty && lawId == null) for (final term in plan.searchTerms.take(5)) { try { final rows = await _lawsRepository.search(term, limit: 12); for (final row in rows) { if (seen.add(row.id)) candidates.add(row); } } catch (_) {} }
+    if (candidates.isEmpty && lawId == null) for (final term in plan.searchTerms.take(5)) { try { final rows = await _lawsRepository.search(term, limit: 12); for (final row in rows) { if (seen.ad[...]
     if (candidates.isEmpty) return [];
     return _filterAndRankWithGemini(question, plan, candidates);
   }
@@ -120,7 +120,7 @@ class LegalAiService {
   Future<List<Madda>> _filterAndRankWithGemini(String question, _LegalQueryPlan plan, List<Madda> candidates) async {
     final context = _buildLocalContext(candidates.take(24).toList());
     final text = await _callGeminiText(
-      systemInstruction: '''أنت مراجع نتائج البحث القانوني في موسوعة القوانين اليمنية. لا تجب عن سؤال المستخدم. راجع المواد المعطاة ثم أعد JSON فقط في الشكل {"relevant_article_numbers":["..."]}.''',
+      systemInstruction: '''أنت مراجع نتائج البحث القانوني في موسوعة القوانين اليمنية. لا تجب عن سؤال المستخدم. راجع الم[...]
       userText: 'السؤال: $question\nالموضوع: ${plan.topic}\nالقانون المرشح: ${plan.lawHint}\n\nالمواد المرشحة:\n$context',
     );
     final json = _extractJsonObject(text);
@@ -155,7 +155,7 @@ class LegalAiService {
 
   List<String> _fallbackSearchTerms(String input) => input.split(RegExp(r'\s+')).map(_normalize).where((term) => term.length >= 3 && !_assistantStopWords.contains(term)).take(8).toList();
 
-  String _normalize(String value) => value.toLowerCase().replaceAll(RegExp(r'[ً-ٟ]'), '').replaceAll(RegExp(r'[إأآٱ]'), 'ا').replaceAll('ى', 'ي').replaceAll('ة', 'ه').replaceAll('ـ', '').replaceAll(RegExp(r'[^\p{L}\p{N}\s]'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+  String _normalize(String value) => value.toLowerCase().replaceAll(RegExp(r'[ً-ٟ]'), '').replaceAll(RegExp(r'[إأآٱ]'), 'ا').replaceAll('ى', 'ي').replaceAll('ة', 'ه').replaceAll('ـ', [...]
 
   Map<String, dynamic>? _extractJsonObject(String text) {
     var value = text.trim();
@@ -181,7 +181,7 @@ class LegalAiService {
         );
         body = {}; try { body = jsonDecode(response.body) as Map<String, dynamic>; } catch (_) {}
         if (response.statusCode == 200) break;
-        if (!_isTemporaryGeminiFailure(response.statusCode, body) || attempt == retryDelays.length) { final apiMessage = _extractApiError(body); final isQuotaExceeded = _isGeminiQuotaExceeded(response.statusCode, body); if (apiMessage != null) { throw LegalAiException(isQuotaExceeded ? 'تجاوزت الحد المسموح من Gemini، حاول لاحقاً.' : apiMessage); } throw const LegalAiException('تعذر الاتصال بالمساعد الذكي.'); }
+        if (!_isTemporaryGeminiFailure(response.statusCode, body) || attempt == retryDelays.length) { final apiMessage = _extractApiError(body); final isQuotaExceeded = _isGeminiQuotaExceeded(res[...]
       } catch (e) {
         if (e is LegalAiException) rethrow;
         if (attempt == retryDelays.length) throw const LegalAiException('تعذر الاتصال بالمساعد الذكي. تحقق من اتصال الإنترنت أو مفتاح Gemini.');
@@ -192,19 +192,19 @@ class LegalAiService {
   }
 
   String _buildLocalAnswer(List<Madda> matches) {
-    if (matches.length == 1) { final m = matches.first; final law = m.lawName?.trim(); final lawText = law == null || law.isEmpty ? '' : ' — $law'; return 'وجدت في قاعدة القوانين المحلية مادة مرتبطة بسؤالك${lawText}:\n\nالمادة ${m.number}\n${m.body}'; }
+    if (matches.length == 1) { final m = matches.first; final law = m.lawName?.trim(); final lawText = law == null || law.isEmpty ? '' : ' — $law'; return 'وجدت في قاعدة القوان[...]
     final buffer = StringBuffer('وجدت ${matches.length} مواد مرتبطة بسؤالك في قاعدة القوانين المحلية:\n');
-    for (var i = 0; i < matches.length; i++) { final m = matches[i]; final law = m.lawName?.trim(); buffer..write('\n${i + 1}. المادة (${m.number})')..write(law == null || law.isEmpty ? '' : ' — $law')..write('\n${m.body}'); }
+    for (var i = 0; i < matches.length; i++) { final m = matches[i]; final law = m.lawName?.trim(); buffer..write('\n${i + 1}. المادة (${m.number})')..write(law == null || law.isEmpty ? '' [...]
     return buffer.toString().trim();
   }
 
-  Future<LegalAiResult> _askGemini({required String question, String? conversationId, required List<Map<String, String>> history, required List<Madda> localMatches, required _LegalQueryPlan queryPlan}) async {
+  Future<LegalAiResult> _askGemini({required String question, String? conversationId, required List<Map<String, String>> history, required List<Madda> localMatches, required _LegalQueryPlan query[...]
     final model = AppConfig.geminiModel.trim().isEmpty ? 'gemini-3.5-flash-lite' : AppConfig.geminiModel.trim();
     final uri = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent');
     final contents = <Map<String, dynamic>>[];
-    for (final item in history) { final role = item['role'] == 'assistant' ? 'model' : 'user'; final content = item['content']?.trim() ?? ''; if (content.isEmpty) continue; contents.add({'role': role, 'parts': [{'text': content}]}); }
+    for (final item in history) { final role = item['role'] == 'assistant' ? 'model' : 'user'; final content = item['content']?.trim() ?? ''; if (content.isEmpty) continue; contents.add({'role': [...]
     final localContext = _buildLocalContext(localMatches);
-    contents.add({'role': 'user', 'parts': [{'text': 'السؤال:\n$question\n\nخطة البحث القانونية:\nالموضوع: ${queryPlan.topic}\nالقانون المرشح: ${queryPlan.lawHint}\n\nالمواد المحلية:\n$localContext'}]});
+    contents.add({'role': 'user', 'parts': [{'text': 'السؤال:\n$question\n\nخطة البحث القانونية:\nالموضوع: ${queryPlan.topic}\nالقانون المرشح: ${queryPl[...]
     http.Response? response; Map<String, dynamic> body = {};
     const retryDelays = <int>[2, 4, 6];
     for (var attempt = 0; attempt <= retryDelays.length; attempt++) {
@@ -217,26 +217,26 @@ class LegalAiService {
         );
         body = {}; try { body = jsonDecode(response.body) as Map<String, dynamic>; } catch (_) {}
         if (response.statusCode == 200) break;
-        if (!_isTemporaryGeminiFailure(response.statusCode, body) || attempt == retryDelays.length) { final apiMessage = _extractApiError(body); final isQuotaExceeded = _isGeminiQuotaExceeded(response.statusCode, body); if (apiMessage != null) { throw LegalAiException(isQuotaExceeded ? 'تجاوزت الحد المسموح من Gemini، حاول لاحقاً.' : apiMessage); } throw const LegalAiException('تعذر الاتصال بالمساعد الذكي.'); }
-      } catch (e) { if (e is LegalAiException) rethrow; if (attempt == retryDelays.length) throw const LegalAiException('تعذر الاتصال بالمساعد الذكي. تحقق من اتصال الإنترنت أو مفتاح Gemini.'); }
+        if (!_isTemporaryGeminiFailure(response.statusCode, body) || attempt == retryDelays.length) { final apiMessage = _extractApiError(body); final isQuotaExceeded = _isGeminiQuotaExceeded(res[...]
+      } catch (e) { if (e is LegalAiException) rethrow; if (attempt == retryDelays.length) throw const LegalAiException('تعذر الاتصال بالمساعد الذكي. تحقق من اتص…[...]
     }
     if (response == null || response.statusCode != 200) throw const LegalAiException('الخدمة مشغولة حالياً. حاول مرة أخرى لاحقاً.');
     final answer = _extractGeneratedText(body); if (answer.isEmpty) throw const LegalAiException('تعذر توليد إجابة من المساعد الذكي.');
-    return LegalAiResult(answer: answer, sources: localMatches.map(LegalAiSource.fromMadda).toList(), conversationId: conversationId, responseSource: localMatches.isEmpty ? 'gemini_ai' : 'local_db');
+    return LegalAiResult(answer: answer, sources: localMatches.map(LegalAiSource.fromMadda).toList(), conversationId: conversationId, responseSource: localMatches.isEmpty ? 'gemini_ai' : 'local_d[...]
   }
 
   String _buildLocalContext(List<Madda> matches) {
     if (matches.isEmpty) return '';
     final buffer = StringBuffer();
-    for (var i = 0; i < matches.length; i++) { final m = matches[i]; buffer..writeln('[المصدر ${i + 1}]')..writeln('القانون: ${m.lawName?.trim().isNotEmpty == true ? m.lawName!.trim() : 'القوانين اليمنية'}')..writeln('المادة: ${m.number}')..writeln(m.body)..writeln(); }
+    for (var i = 0; i < matches.length; i++) { final m = matches[i]; buffer..writeln('[المصدر ${i + 1}]')..writeln('القانون: ${m.lawName?.trim().isNotEmpty == true ? m.lawName!.trim([...]
     return buffer.toString().trim();
   }
 
-  String _extractGeneratedText(Map<String, dynamic> body) { final candidates = body['candidates']; if (candidates is! List || candidates.isEmpty) return ''; final content = candidates.first is Map ? (candidates.first as Map<String, dynamic>)['content'] : null; if (content is! Map) return ''; final parts = content['parts']; if (parts is! List || parts.isEmpty) return ''; final text = parts.first is Map ? (parts.first as Map<String, dynamic>)['text'] : null; return text?.toString() ?? ''; }
-  bool _isTemporaryGeminiFailure(int statusCode, Map<String, dynamic> body) { final message = _extractApiError(body)?.toLowerCase() ?? ''; if (statusCode == 429) { final quotaExceeded = message.contains('quota') || message.contains('limit'); return quotaExceeded || message.contains('rate limit') || message.contains('too many requests'); } return statusCode == 500 || statusCode == 502 || statusCode == 503 || statusCode == 504 || message.contains('temporar') || message.contains('overloaded') || message.contains('unavailable'); }
-  bool _isGeminiQuotaExceeded(int statusCode, Map<String, dynamic> body) { if (statusCode == 429) { final message = _extractApiError(body)?.toLowerCase() ?? ''; return message.contains('quota') || message.contains('limit'); } return false; }
+  String _extractGeneratedText(Map<String, dynamic> body) { final candidates = body['candidates']; if (candidates is! List || candidates.isEmpty) return ''; final content = candidates.first is Ma[...]
+  bool _isTemporaryGeminiFailure(int statusCode, Map<String, dynamic> body) { final message = _extractApiError(body)?.toLowerCase() ?? ''; if (statusCode == 429) { final quotaExceeded = message.c[...]
+  bool _isGeminiQuotaExceeded(int statusCode, Map<String, dynamic> body) { if (statusCode == 429) { final message = _extractApiError(body)?.toLowerCase() ?? ''; return message.contains('quota') |[...]
   String? _extractApiError(Map<String, dynamic> body) { final error = body['error']; if (error is Map && error['message'] != null) return error['message'].toString(); return null; }
-  Future<void> _saveHistorySafely({required String query, required String response, required String source}) async { try { await _historyDb.addSearch(query: query, response: response, source: source); } catch (_) {} }
+  Future<void> _saveHistorySafely({required String query, required String response, required String source}) async { try { await _historyDb.addSearch(query: query, response: response, source: sou[...]
 
   static const Set<String> _assistantStopWords = {
     'ما', 'ماذا', 'هل', 'هو', 'هي', 'هذا', 'هذه', 'ذلك', 'تلك', 'من', 'في',
