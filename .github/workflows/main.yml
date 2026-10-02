@@ -36,6 +36,16 @@ jobs:
       - name: Create Android local.properties
         run: echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
 
+      - name: Restore Gradle wrapper JAR
+        run: |
+          set -e
+          if [ ! -s android/gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "Missing gradle-wrapper.jar; regenerating wrapper with Gradle 8.14."
+            cd android
+            gradle wrapper --gradle-version 8.14
+          fi
+          test -s android/gradle/wrapper/gradle-wrapper.jar
+
       - name: Verify Flutter and Android toolchain
         run: flutter doctor -v || true
 
