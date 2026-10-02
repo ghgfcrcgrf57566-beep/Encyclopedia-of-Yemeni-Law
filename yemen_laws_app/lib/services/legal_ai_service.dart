@@ -3,60 +3,10 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../core/app_config.dart';
-import '../data/models/law.dart';
-import '../data/models/madda.dart';
-import '../data/repositories/laws_repository.dart';
-import 'chat_history_db.dart';
-
-class LegalAiSource {
-  final int articleId;
-  final String lawName;
-  final String articleNumber;
-  final String articleText;
-  final String? chapter;
-  final double? score;
-  final String? reference;
-
-  const LegalAiSource({
-    required this.articleId,
-    required this.lawName,
-    required this.articleNumber,
-    required this.articleText,
-    this.chapter,
-    this.score,
-    this.reference,
-  });
-
-  factory LegalAiSource.fromJson(Map<String, dynamic> json) {
-    return LegalAiSource(
-      articleId: (json['article_id'] as num?)?.toInt() ??
-          (json['id'] as num?)?.toInt() ?? 0,
-      lawName: (json['law_name'] ?? json['law_title'] ?? '').toString(),
-      articleNumber: (json['article_number'] ?? '').toString(),
-      articleText: (json['article_text'] ?? '').toString(),
-      chapter: json['chapter']?.toString(),
-      score: (json['score'] as num?)?.toDouble(),
-      reference: json['reference']?.toString(),
-    );
-  }
-
-  factory LegalAiSource.fromMadda(Madda madda) {
-    final context = [
-      if (madda.babLabel != null && madda.babLabel!.trim().isNotEmpty)
-        madda.babLabel!.trim(),
-      if (madda.faslLabel != null && madda.faslLabel!.trim().isNotEmpty)
-        madda.faslLabel!.trim(),
-    ].join(' - ');
-
-    return LegalAiSource(
-      articleId: madda.id,
-      lawName: madda.lawName ?? 'القوانين اليمنية',
-      articleNumber: madda.number,
-      articleText: madda.body,
-      reference: context.isEmpty ? null : context,
-    );
-  }
-}
+import '../data/database_helper.dart';
+import '../models/law.dart';
+import '../models/madda.dart';
+import '../repositories/laws_repository.dart';
 
 class LegalAiResult {
   final String answer;
@@ -67,123 +17,122 @@ class LegalAiResult {
   const LegalAiResult({
     required this.answer,
     required this.sources,
-    this.conversationId,
+    required this.conversationId,
     required this.responseSource,
   });
 }
 
-class _LegalQueryPlan {
-  final String topic;
-  final String lawHint;
-  final List<String> searchTerms;
+class LegalAiSource {
+  final int id;
+  final String articleNumber;
+  final String lawName;
+  final String body;
+  final String? babLabel;
+  final String? faslLabel;
 
-  const _LegalQueryPlan({
-    required this.topic,
-    required this.lawHint,
-    required this.searchTerms,
+  const LegalAiSource({
+    required this.id,
+    required this.articleNumber,
+    required this.lawName,
+    required this.body,
+    this.babLabel,
+    this.faslLabel,
   });
+
+  factory LegalAiSource.fromMadda(Madda m) {
+    return LegalAiSource(
+      id: m.id,
+      articleNumber: m.number,
+      lawName: m.lawName?.trim().isNotEmpty == true
+          ? m.lawName!.trim()
+          : 'القوانين اليمنية',
+      body: m.body,
+      babLabel: m.babLabel,
+      faslLabel: m.faslLabel,
+    );
+  }
 }
 
 class LegalAiService {
-  LegalAiService._();
+  final LawsRepository _lawsRepository;
+  final DatabaseHelper _historyDb;
 
-  static final instance = LegalAiService._();
-
-  final ChatHistoryDb _historyDb = ChatHistoryDb.instance;
-  final LawsRepository _lawsRepository = LawsRepository.instance;
+  LegalAiService({
+    LawsRepository? lawsRepository,
+    DatabaseHelper? historyDb,
+  })  : _lawsRepository = lawsRepository ?? LawsRepository(),
+        _historyDb = historyDb ?? DatabaseHelper.instance;
 
   Future<LegalAiResult> ask({
     required String question,
     String? conversationId,
     List<Map<String, String>> history = const [],
   }) async {
-    final q = question.trim();
-
-    if (q.isEmpty) {
-      throw const LegalAiException('يرجى كتابة السؤال أولاً.');
-    }
-
-    if (q.length > 1200) {
-      throw const LegalAiException(
-        'السؤال طويل جداً. اختصره إلى 1200 حرف كحد أقصى.',
-      );
+    final trimmed = question.trim();
+    if (trimmed.isEmpty) {
+      throw const LegalAiException('اكتب سؤالك القانوني أولاً.');
     }
 
     if (AppConfig.geminiApiKey.trim().isEmpty) {
-      final localMatches = await _lawsRepository.searchForLegalAssistant(
-        q,
-        limit: 8,
+      final local = await _lawsRepository.searchForLegalAssistant(trimmed);
+      final answer = local.isEmpty
+          ? 'لم أجد مادة مرتبطة مباشرة بسؤالك في قاعدة القوانين المحلية.'
+          : _buildLocalAnswer(local);
+      await _saveHistorySafely(
+        query: trimmed,
+        response: answer,
+        source: 'local_db',
       );
-      if (localMatches.isNotEmpty) {
-        final result = LegalAiResult(
-          answer: _buildLocalAnswer(localMatches),
-          sources: localMatches.map(LegalAiSource.fromMadda).toList(),
-          conversationId: conversationId,
-          responseSource: 'local_db',
-        );
-        await _saveHistorySafely(
-          query: q,
-          response: result.answer,
-          source: result.responseSource,
-        );
-        return result;
-      }
-
-      throw const LegalAiException(
-        'لم يتم إعداد مفتاح المساعد الذكي. ابنِ التطبيق باستخدام GEMINI_API_KEY.',
+      return LegalAiResult(
+        answer: answer,
+        sources: local.map(LegalAiSource.fromMadda).toList(),
+        conversationId: conversationId,
+        responseSource: 'local_db',
       );
     }
 
-    try {
-      // Gemini يدخل قبل البحث النهائي: يحلل السؤال ويحدد المجال والقانون
-      // والمصطلحات القانونية، ثم تستخدم SQLite هذه الخطة لتقييد البحث.
-      final plan = await _planLegalQuery(q);
-      final localMatches = await _refinedLocalSearch(q, plan);
+    final plan = await _planLegalQuery(trimmed);
+    final localMatches = await _refinedLocalSearch(trimmed, plan);
 
+    if (localMatches.isEmpty) {
       final result = await _askGemini(
-        question: q,
+        question: trimmed,
         conversationId: conversationId,
         history: history,
-        localMatches: localMatches,
+        localMatches: const [],
         queryPlan: plan,
       );
-
       await _saveHistorySafely(
-        query: q,
+        query: trimmed,
         response: result.answer,
         source: result.responseSource,
       );
-
       return result;
-    } on LegalAiException {
-      rethrow;
-    } catch (_) {
-      throw const LegalAiException(
-        'تعذر الاتصال بالمساعد الذكي. تحقق من اتصال الإنترنت وحاول مرة أخرى.',
-      );
     }
+
+    final result = await _askGemini(
+      question: trimmed,
+      conversationId: conversationId,
+      history: history,
+      localMatches: localMatches,
+      queryPlan: plan,
+    );
+    await _saveHistorySafely(
+      query: trimmed,
+      response: result.answer,
+      source: result.responseSource,
+    );
+    return result;
   }
 
   Future<_LegalQueryPlan> _planLegalQuery(String question) async {
     final text = await _callGeminiText(
       systemInstruction: '''
-أنت محلل استعلامات قانونية لموسوعة القوانين اليمنية.
-لا تجب عن سؤال المستخدم.
-مهمتك تحويل السؤال إلى خطة بحث داخل قاعدة القوانين اليمنية المحلية.
-
-حدد:
-1. الموضوع القانوني الرئيسي.
-2. القانون اليمني المحتمل أن يحكم الموضوع.
-3. مصطلحات البحث القانونية المرتبطة بالموضوع.
-
-قواعد مهمة:
-- لا تخترع رقم مادة أو نصاً قانونياً.
-- لا تعتمد على مواد خارجية.
-- افهم المعنى القانوني للسؤال ولا تعتمد على التطابق الحرفي فقط.
-- إذا كان السؤال عن الزواج أو الطلاق أو الخلع أو النفقة أو الحضانة أو النشوز أو المهر أو العدة أو النسب أو الولاية أو التفريق أو فسخ عقد الزواج، فاعتبر قانون الأحوال الشخصية هو القانون المرشح ما لم توجد قرينة واضحة على غير ذلك.
-- لا تضع كلمات السؤال العامة مثل: ما، هي، جميع، حالات، ما هي ضمن مصطلحات البحث.
-- استخدم مرادفات قانونية مفيدة للبحث.
-
+أنت محلل لاستفسارات قانونية يمنية.
+لا تجب عن السؤال.
+حدد الموضوع القانوني والقانون اليمني المحتمل واستخرج مصطلحات بحث قانونية دقيقة.
+استخدم المرادفات القانونية عند الحاجة.
+موضوعات الزواج والطلاق والخلع والنفقة والحضانة والنشوز والمهر والعدة والنسب والولاية والتفريق وفسخ عقد الزواج ترجح قانون الأحوال الشخصية ما لم توجد قرينة واضحة على قانون آخر.
 أعد JSON صالحاً فقط بهذا الشكل:
 {"topic":"...","law":"...","search_terms":["...","..."]}
 ''',
@@ -210,7 +159,9 @@ class LegalAiService {
       }
     }
 
-    if (terms.isEmpty) terms.addAll(_fallbackSearchTerms(topic.isEmpty ? question : topic));
+    if (terms.isEmpty) {
+      terms.addAll(_fallbackSearchTerms(topic.isEmpty ? question : topic));
+    }
 
     return _LegalQueryPlan(
       topic: topic.isEmpty ? question : topic,
@@ -244,8 +195,6 @@ class LegalAiService {
       } catch (_) {}
     }
 
-    // ابحث داخل القانون الذي حدده Gemini أولاً، وبمصطلحات الموضوع لا بجميع
-    // كلمات السؤال. هذا يمنع الدستور من الفوز بسبب كلمات عامة.
     for (final term in plan.searchTerms) {
       await addResults(term);
       if (candidates.length >= 24) break;
@@ -255,8 +204,6 @@ class LegalAiService {
       await addResults(plan.topic);
     }
 
-    // إذا لم يستطع Gemini تحديد قانون، نجري بحثاً محدوداً ثم ننقح النتائج
-    // بواسطة Gemini قبل استخدامها في الإجابة.
     if (candidates.isEmpty && lawId == null) {
       for (final term in plan.searchTerms.take(5)) {
         try {
@@ -270,7 +217,6 @@ class LegalAiService {
     }
 
     if (candidates.isEmpty) return [];
-
     return _filterAndRankWithGemini(question, plan, candidates);
   }
 
@@ -285,18 +231,15 @@ class LegalAiService {
 أنت مراجع نتائج البحث القانوني في موسوعة القوانين اليمنية.
 لا تجب عن سؤال المستخدم.
 راجع المواد المحلية المرشحة وحدد المواد التي ترتبط مباشرة بموضوع السؤال.
-
-القواعد:
-- استبعد أي مادة غير مرتبطة بالموضوع القانوني.
-- لا تعتبر تشابه كلمة واحدة دليلاً على الصلة.
-- إذا كان السؤال من الأحوال الشخصية، فلا تقبل مواد الدستور أو القوانين الأخرى لمجرد وجود كلمات عامة مشتركة.
-- لا تخترع مادة أو تعدل نص مادة.
-- إذا كانت النتائج غير كافية، لا تحاول تعويض النقص بمعلومات من خارج المواد.
-
+استبعد أي مادة غير مرتبطة بالموضوع القانوني.
+لا تعتبر تشابه كلمة واحدة دليلاً على الصلة.
+إذا كان السؤال من الأحوال الشخصية، فلا تقبل مواد الدستور أو القوانين الأخرى لمجرد وجود كلمات عامة مشتركة.
+لا تخترع مادة أو تعدل نص مادة.
 أعد JSON صالحاً فقط:
 {"relevant_article_numbers":["1","2"],"sufficient":true}
 ''',
-      userText: 'السؤال: $question\nالموضوع: ${plan.topic}\nالقانون المرشح: ${plan.lawHint}\n\nالمواد المرشحة:\n$context',
+      userText:
+          'السؤال: $question\nالموضوع: ${plan.topic}\nالقانون المرشح: ${plan.lawHint}\n\nالمواد المرشحة:\n$context',
     );
 
     final json = _extractJsonObject(text);
@@ -305,19 +248,29 @@ class LegalAiService {
     final raw = json['relevant_article_numbers'];
     if (raw is! List) return _rankLocally(candidates, plan);
 
-    final numbers = raw.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toSet();
-    final filtered = candidates.where((m) => numbers.contains(m.number.trim())).toList();
+    final numbers = raw
+        .map((e) => e.toString().trim())
+        .where((e) => e.isNotEmpty)
+        .toSet();
+    final filtered = candidates
+        .where((m) => numbers.contains(m.number.trim()))
+        .toList();
 
     if (filtered.isEmpty) return [];
     return filtered.take(8).toList();
   }
 
   List<Madda> _rankLocally(List<Madda> candidates, _LegalQueryPlan plan) {
-    final terms = plan.searchTerms.map(_normalize).where((e) => e.isNotEmpty).toList();
+    final terms = plan.searchTerms
+        .map(_normalize)
+        .where((e) => e.isNotEmpty)
+        .toList();
     final scored = <MapEntry<Madda, int>>[];
 
     for (final m in candidates) {
-      final haystack = _normalize('${m.lawName ?? ''} ${m.number} ${m.babLabel ?? ''} ${m.faslLabel ?? ''} ${m.body}');
+      final haystack = _normalize(
+        '${m.lawName ?? ''} ${m.number} ${m.babLabel ?? ''} ${m.faslLabel ?? ''} ${m.body}',
+      );
       var score = 0;
       for (final term in terms) {
         if (haystack.contains(term)) score += term.length >= 4 ? 2 : 1;
@@ -326,7 +279,11 @@ class LegalAiService {
     }
 
     scored.sort((a, b) => b.value.compareTo(a.value));
-    return scored.where((e) => e.value > 0).map((e) => e.key).take(8).toList();
+    return scored
+        .where((e) => e.value > 0)
+        .map((e) => e.key)
+        .take(8)
+        .toList();
   }
 
   Law? _findLaw(List<Law> laws, String hint) {
@@ -335,7 +292,9 @@ class LegalAiService {
 
     for (final law in laws) {
       final name = _normalize(law.name);
-      if (name == normalizedHint || name.contains(normalizedHint) || normalizedHint.contains(name)) {
+      if (name == normalizedHint ||
+          name.contains(normalizedHint) ||
+          normalizedHint.contains(name)) {
         return law;
       }
     }
@@ -346,7 +305,10 @@ class LegalAiService {
     final terms = input
         .split(RegExp(r'\s+'))
         .map(_normalize)
-        .where((term) => term.length >= 3 && !_assistantStopWords.contains(term))
+        .where(
+          (term) =>
+              term.length >= 3 && !_assistantStopWords.contains(term),
+        )
         .toList();
     return terms.take(8).toList();
   }
@@ -402,7 +364,9 @@ class LegalAiService {
 
     for (var attempt = 0; attempt <= retryDelays.length; attempt++) {
       if (attempt > 0) {
-        await Future<void>.delayed(Duration(seconds: retryDelays[attempt - 1]));
+        await Future<void>.delayed(
+          Duration(seconds: retryDelays[attempt - 1]),
+        );
       }
 
       try {
@@ -440,9 +404,11 @@ class LegalAiService {
 
         if (response.statusCode == 200) break;
 
-        if (!_isTemporaryGeminiFailure(response.statusCode, body) || attempt == retryDelays.length) {
+        if (!_isTemporaryGeminiFailure(response.statusCode, body) ||
+            attempt == retryDelays.length) {
           final apiMessage = _extractApiError(body);
-          final isQuotaExceeded = _isGeminiQuotaExceeded(response.statusCode, body);
+          final isQuotaExceeded =
+              _isGeminiQuotaExceeded(response.statusCode, body);
           throw LegalAiException(
             isQuotaExceeded
                 ? 'تم تجاوز الحد المتاح حالياً لخدمة المساعد. يرجى المحاولة لاحقاً.'
@@ -476,11 +442,13 @@ class LegalAiService {
     if (matches.length == 1) {
       final m = matches.first;
       final law = m.lawName?.trim();
-      final lawText = law == null || law.isEmpty ? '' : ' — ' + law;
-      return 'وجدت في قاعدة القوانين المحلية المادة (' + m.number + ')' + lawText + ':\n\n' + m.body.trim();
+      final lawText = law == null || law.isEmpty ? '' : ' — $law';
+      return 'وجدت في قاعدة القوانين المحلية المادة (${m.number})$lawText:\n\n${m.body.trim()}';
     }
 
-    final buffer = StringBuffer('وجدت ${matches.length} مواد مرتبطة بسؤالك في قاعدة القوانين المحلية:\n');
+    final buffer = StringBuffer(
+      'وجدت ${matches.length} مواد مرتبطة بسؤالك في قاعدة القوانين المحلية:\n',
+    );
     for (var i = 0; i < matches.length; i++) {
       final m = matches[i];
       final law = m.lawName?.trim();
@@ -539,7 +507,11 @@ class LegalAiService {
     Map<String, dynamic> body = {};
 
     for (var attempt = 0; attempt <= retryDelays.length; attempt++) {
-      if (attempt > 0) await Future<void>.delayed(Duration(seconds: retryDelays[attempt - 1]));
+      if (attempt > 0) {
+        await Future<void>.delayed(
+          Duration(seconds: retryDelays[attempt - 1]),
+        );
+      }
       try {
         response = await http
             .post(
@@ -596,9 +568,11 @@ class LegalAiService {
 
         if (response.statusCode == 200) break;
 
-        if (!_isTemporaryGeminiFailure(response.statusCode, body) || attempt == retryDelays.length) {
+        if (!_isTemporaryGeminiFailure(response.statusCode, body) ||
+            attempt == retryDelays.length) {
           final apiMessage = _extractApiError(body);
-          final isQuotaExceeded = _isGeminiQuotaExceeded(response.statusCode, body);
+          final isQuotaExceeded =
+              _isGeminiQuotaExceeded(response.statusCode, body);
           throw LegalAiException(
             isQuotaExceeded
                 ? 'تم تجاوز الحد المتاح حالياً لخدمة المساعد. يرجى المحاولة لاحقاً.'
@@ -643,7 +617,9 @@ class LegalAiService {
       final m = matches[i];
       buffer
         ..writeln('[المصدر ${i + 1}]')
-        ..writeln('القانون: ${m.lawName?.trim().isNotEmpty == true ? m.lawName!.trim() : 'القوانين اليمنية'}')
+        ..writeln(
+          'القانون: ${m.lawName?.trim().isNotEmpty == true ? m.lawName!.trim() : 'القوانين اليمنية'}',
+        )
         ..writeln('المادة: ${m.number}')
         ..writeln('النص:')
         ..writeln(m.body.trim());
@@ -661,18 +637,24 @@ class LegalAiService {
   String _extractGeneratedText(Map<String, dynamic> body) {
     final candidates = body['candidates'];
     if (candidates is! List || candidates.isEmpty) return '';
-    final content = candidates.first is Map ? (candidates.first as Map)['content'] : null;
+    final content =
+        candidates.first is Map ? (candidates.first as Map)['content'] : null;
     if (content is! Map) return '';
     final parts = content['parts'];
     if (parts is! List) return '';
     final buffer = StringBuffer();
     for (final part in parts) {
-      if (part is Map && part['text'] != null) buffer.write(part['text'].toString());
+      if (part is Map && part['text'] != null) {
+        buffer.write(part['text'].toString());
+      }
     }
     return buffer.toString().trim();
   }
 
-  bool _isTemporaryGeminiFailure(int statusCode, Map<String, dynamic> body) {
+  bool _isTemporaryGeminiFailure(
+    int statusCode,
+    Map<String, dynamic> body,
+  ) {
     final message = _extractApiError(body)?.toLowerCase() ?? '';
     if (statusCode == 429) {
       final quotaExceeded = message.contains('quota exceeded') ||
@@ -702,7 +684,9 @@ class LegalAiService {
 
   String? _extractApiError(Map<String, dynamic> body) {
     final error = body['error'];
-    if (error is Map && error['message'] != null) return error['message'].toString();
+    if (error is Map && error['message'] != null) {
+      return error['message'].toString();
+    }
     return null;
   }
 
@@ -712,14 +696,24 @@ class LegalAiService {
     required String source,
   }) async {
     try {
-      await _historyDb.addSearch(query: query, response: response, source: source);
+      await _historyDb.addSearch(
+        query: query,
+        response: response,
+        source: source,
+      );
     } catch (_) {}
   }
 
   String _status(int statusCode) {
-    if (statusCode == 400) return 'تعذر فهم طلب المساعد. حاول صياغة السؤال بطريقة أخرى.';
-    if (statusCode == 401 || statusCode == 403) return 'مفتاح المساعد الذكي غير صالح أو غير مصرح به.';
-    if (statusCode == 429) return 'تم تجاوز حد استخدام المساعد مؤقتاً. حاول لاحقاً.';
+    if (statusCode == 400) {
+      return 'تعذر فهم طلب المساعد. حاول صياغة السؤال بطريقة أخرى.';
+    }
+    if (statusCode == 401 || statusCode == 403) {
+      return 'مفتاح المساعد الذكي غير صالح أو غير مصرح به.';
+    }
+    if (statusCode == 429) {
+      return 'تم تجاوز حد استخدام المساعد مؤقتاً. حاول لاحقاً.';
+    }
     if (statusCode >= 500) return 'خدمة المساعد الذكي غير متاحة حالياً.';
     return 'حدث خطأ أثناء معالجة السؤال.';
   }
@@ -727,8 +721,20 @@ class LegalAiService {
   static const Set<String> _assistantStopWords = {
     'ما', 'ماذا', 'هل', 'هو', 'هي', 'هذا', 'هذه', 'ذلك', 'تلك', 'من', 'في',
     'فيه', 'عن', 'على', 'الى', 'إلى', 'مع', 'لي', 'لدي', 'اريد', 'أريد',
-    'يمكن', 'كيف', 'متى', 'أين', 'اين', 'جميع', 'ماهي', 'هي',
+    'يمكن', 'كيف', 'متى', 'أين', 'اين', 'جميع', 'ماهي',
   };
+}
+
+class _LegalQueryPlan {
+  final String topic;
+  final String lawHint;
+  final List<String> searchTerms;
+
+  const _LegalQueryPlan({
+    required this.topic,
+    required this.lawHint,
+    required this.searchTerms,
+  });
 }
 
 class LegalAiException implements Exception {
