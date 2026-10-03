@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_pdfview/flutter_pdfview.dart';
@@ -18,7 +20,7 @@ class LegalReferencesScreen extends StatefulWidget {
 }
 
 class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
-  static const _cacheKey = 'cached_legal_references_json_v4';
+  static const _cacheKey = 'cached_legal_references_json_v5';
   final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 15),
     receiveTimeout: const Duration(seconds: 90),
@@ -56,11 +58,20 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
     }
   }
 
+  bool _isValidReference(Map<String, dynamic> item) {
+    final pdf = '${item['pdf_url'] ?? ''}'.trim();
+    final source = '${item['source_url'] ?? item['source'] ?? ''}'.trim();
+    if (pdf.isEmpty && source.isEmpty) return false;
+    if (pdf.isEmpty) return false;
+    return Uri.tryParse(pdf)?.hasScheme == true;
+  }
+
   List<Map<String, dynamic>> _mergeUnique(List<List<Map<String, dynamic>>> groups) {
     final result = <Map<String, dynamic>>[];
     final seen = <String>{};
     for (final group in groups) {
       for (final item in group) {
+        if (!_isValidReference(item)) continue;
         final id = '${item['id'] ?? ''}'.trim();
         if (id.isNotEmpty && seen.add(id)) result.add(item);
       }
@@ -105,7 +116,7 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
     final prefs = await SharedPreferences.getInstance();
     final cached = prefs.getString(_cacheKey);
     if (cached != null) {
-      final value = _parse(cached);
+      final value = _mergeUnique([_parse(cached)]);
       if (value.isNotEmpty) {
         _apply(value);
         _source = 'نسخة محفوظة محليًا';
@@ -129,17 +140,7 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
         _source = 'محدّث من GitHub';
       }
     } catch (_) {
-      try {
-        final response = await _dio.get<String>(kLegalReferencesIndexUrl);
-        if (response.statusCode == 200 && response.data != null) {
-          final value = _parse(response.data!);
-          if (value.isNotEmpty) {
-            await prefs.setString(_cacheKey, jsonEncode(value));
-            _apply(value);
-            _source = 'محدّث من GitHub';
-          }
-        }
-      } catch (_) {}
+      // النسخة المحلية تستمر بالعمل عند انقطاع الإنترنت.
     }
 
     await _refreshDownloaded();
@@ -149,7 +150,8 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
   Future<void> _refreshDownloaded() async {
     final found = <String>{};
     for (final item in _items) {
-      if (await (await _file(item)).exists()) found.add(_fileName(item));
+      final file = await _file(item);
+      if (await file.exists()) found.add(_fileName(item));
     }
     if (mounted) {
       setState(() {
@@ -169,7 +171,7 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
 
     final url = '${item['pdf_url'] ?? ''}'.trim();
     if (url.isEmpty) {
-      _message('لا يوجد ملف PDF متاح لهذا المرجع.');
+      _message('لا يوجد ملف PDF مباشر لهذا المرجع.');
       return;
     }
 
@@ -200,7 +202,7 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
     } catch (_) {
       if (await temp.exists()) await temp.delete();
       if (mounted) setState(() => _progress.remove(id));
-      _message('تعذر تنزيل المرجع حاليًا.');
+      _message('تعذر تنزيل المرجع من المصدر حاليًا.');
     }
   }
 
@@ -233,25 +235,13 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
                   width: 42,
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 18),
-                  decoration: BoxDecoration(
-                    color: Colors.white24,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
+                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(4)),
                 ),
               ),
               Row(
                 textDirection: TextDirection.rtl,
                 children: [
-                  Container(
-                    width: 52,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      color: const Color(0xFF302319),
-                      border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.6)),
-                    ),
-                    child: const Icon(Icons.menu_book_rounded, color: Color(0xFFD4AF37), size: 30),
-                  ),
+                  _cover(item, width: 52, height: 64),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -270,17 +260,9 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
                   style: const TextStyle(color: Color(0xFFD4AF37), fontSize: 14, fontWeight: FontWeight.w700),
                 ),
               const SizedBox(height: 18),
-              const Text(
-                'نبذة عن المرجع ومحتوياته',
-                textAlign: TextAlign.right,
-                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
-              ),
+              const Text('نبذة عن المرجع ومحتوياته', textAlign: TextAlign.right, style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
               const SizedBox(height: 10),
-              Text(
-                summary,
-                textAlign: TextAlign.right,
-                style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.8),
-              ),
+              Text(summary, textAlign: TextAlign.right, style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.8)),
               const SizedBox(height: 22),
               SizedBox(
                 height: 48,
@@ -302,36 +284,39 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
     );
   }
 
+  Widget _cover(Map<String, dynamic> item, {double width = 58, double height = 70}) {
+    const gold = Color(0xFFD4AF37);
+    final url = '${item['cover_image_url'] ?? ''}'.trim();
+    final hasUrl = url.isNotEmpty && Uri.tryParse(url)?.hasScheme == true;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: width,
+        height: height,
+        color: const Color(0xFF302319),
+        child: hasUrl
+            ? CachedNetworkImage(
+                imageUrl: url,
+                fit: BoxFit.cover,
+                fadeInDuration: const Duration(milliseconds: 180),
+                placeholder: (_, __) => const Center(
+                  child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: gold)),
+                ),
+                errorWidget: (_, __, ___) => const Icon(Icons.menu_book_rounded, color: gold, size: 30),
+              )
+            : const Icon(Icons.menu_book_rounded, color: gold, size: 30),
+      ),
+    );
+  }
+
   void _openPdf(String path, String title) {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => _ReferencePdfViewer(filePath: path, title: title),
-    ));
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => _ReferencePdfViewer(filePath: path, title: title)));
   }
 
   void _message(String text) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(text, textAlign: TextAlign.right)),
-    );
-  }
-
-  Widget _bookCover(bool downloaded) {
-    const gold = Color(0xFFD4AF37);
-    return Container(
-      width: 58,
-      height: 70,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF4A321D), Color(0xFF1E1711)],
-        ),
-        border: Border.all(color: gold.withValues(alpha: 0.55)),
-        boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 8, offset: Offset(2, 3))],
-      ),
-      child: Icon(downloaded ? Icons.menu_book_rounded : Icons.auto_stories_rounded, color: gold, size: 31),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text, textAlign: TextAlign.right)));
   }
 
   @override
@@ -399,16 +384,13 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
                             return Card(
                               color: surface,
                               margin: const EdgeInsets.only(bottom: 10),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(18),
-                                side: const BorderSide(color: Colors.white10),
-                              ),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18), side: const BorderSide(color: Colors.white10)),
                               child: Padding(
                                 padding: const EdgeInsets.all(10),
                                 child: Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    _bookCover(downloaded),
+                                    _cover(item),
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Column(
@@ -417,31 +399,34 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
                                           Text('${item['title'] ?? ''}', textAlign: TextAlign.right, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, height: 1.35)),
                                           if (author.isNotEmpty || category.isNotEmpty) ...[
                                             const SizedBox(height: 4),
-                                            Text([author, category].where((e) => e.isNotEmpty).join(' — '), textAlign: TextAlign.right, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: gold, fontSize: 12)),
+                                            Text([author, category].where((e) => e.isNotEmpty).join(' — '), textAlign: TextAlign.right, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: gold, fontSize: 12.5, height: 1.3)),
                                           ],
                                           const SizedBox(height: 5),
-                                          Text('${item['description'] ?? ''}', textAlign: TextAlign.right, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white60, height: 1.45, fontSize: 11.5)),
+                                          Text('${item['description'] ?? ''}', textAlign: TextAlign.right, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white60, fontSize: 12, height: 1.35)),
+                                          if (progress != null) ...[
+                                            const SizedBox(height: 8),
+                                            LinearProgressIndicator(value: progress, color: gold, backgroundColor: Colors.white12, minHeight: 3),
+                                            const SizedBox(height: 3),
+                                            Text('${(progress * 100).round()}%', style: const TextStyle(color: Colors.white54, fontSize: 10)),
+                                          ],
                                         ],
                                       ),
                                     ),
                                     const SizedBox(width: 4),
-                                    if (progress != null)
-                                      SizedBox(width: 40, height: 40, child: CircularProgressIndicator(value: progress, color: gold, strokeWidth: 3))
-                                    else
-                                      Column(
-                                        children: [
-                                          IconButton(
-                                            tooltip: 'نبذة عن المرجع',
-                                            onPressed: () => _showBookSummary(context, item),
-                                            icon: const Icon(Icons.info_outline_rounded, color: gold),
-                                          ),
-                                          IconButton(
-                                            tooltip: downloaded ? 'قراءة المرجع' : 'تنزيل المرجع',
-                                            onPressed: () => _download(item),
-                                            icon: Icon(downloaded ? Icons.menu_book_rounded : Icons.file_download_outlined, color: gold),
-                                          ),
-                                        ],
-                                      ),
+                                    Column(
+                                      children: [
+                                        IconButton(
+                                          tooltip: 'نبذة عن المرجع',
+                                          icon: const Icon(Icons.info_outline_rounded, color: gold),
+                                          onPressed: () => _showBookSummary(context, item),
+                                        ),
+                                        IconButton(
+                                          tooltip: downloaded ? 'فتح المرجع' : 'تنزيل المرجع',
+                                          icon: Icon(downloaded ? Icons.menu_book_rounded : Icons.file_download_outlined, color: gold),
+                                          onPressed: progress == null ? () => _download(item) : null,
+                                        ),
+                                      ],
+                                    ),
                                   ],
                                 ),
                               ),
@@ -463,15 +448,22 @@ class _ReferencePdfViewer extends StatelessWidget {
   const _ReferencePdfViewer({required this.filePath, required this.title});
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: Text(title, overflow: TextOverflow.ellipsis), centerTitle: true),
-        body: PDFView(
-          filePath: filePath,
-          enableSwipe: true,
-          swipeHorizontal: false,
-          autoSpacing: true,
-          pageFling: true,
-          showScrollIndicators: true,
-        ),
-      );
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFFF0D78A), fontSize: 15)),
+        iconTheme: const IconThemeData(color: Color(0xFFD4AF37)),
+      ),
+      body: PDFView(
+        filePath: filePath,
+        enableSwipe: true,
+        swipeHorizontal: false,
+        autoSpacing: true,
+        pageFling: true,
+        fitPolicy: FitPolicy.BOTH,
+      ),
+    );
+  }
 }
