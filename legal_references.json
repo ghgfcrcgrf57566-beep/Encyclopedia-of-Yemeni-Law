@@ -130,5 +130,49 @@
     "category": "القانون المدني",
     "description": "الكفالة، الرهن الرسمي، الرهن الحيازي، حقوق التأمين العينية والشخصية.",
     "pdf_url": "https://github.com/ghgfcrcgrf57566-beep/Encyclopedia-of-Yemeni-Law/releases/download/v1.0.0/sanhouri_10.pdf"
+  },
+  {
+    "id": "ahkam_al_awqaf",
+    "title": "أحكام الأوقاف",
+    "author": "أحمد بن عمرو الخصاف",
+    "category": "الفقه والقانون الوقفي",
+    "description": "مرجع تراثي متخصص في أحكام الأوقاف، متاح حاليًا للقراءة والتنزيل من Arabic Collections Online.",
+    "source": "NYU / American University of Beirut",
+    "source_url": "https://sites.dlib.nyu.edu/viewer/books/aub_aco001101/display?lang=ar",
+    "pdf_url": "https://mc.dlib.nyu.edu/files/books/aub_aco001101/aub_aco001101_lo.pdf",
+    "access": "public_domain"
+  },
+  {
+    "id": "tarikh_al_tashri_al_islami",
+    "title": "تاريخ التشريع الإسلامي",
+    "author": "محمد الخضري",
+    "category": "تاريخ التشريع والفقه الإسلامي",
+    "description": "مرجع في نشأة التشريع الإسلامي وتطوره، والكتاب متاح حاليًا للتنزيل بصيغة PDF.",
+    "source": "NYU / American University of Beirut",
+    "source_url": "https://sites.dlib.nyu.edu/viewer/books/aub_aco003901/display?lang=ar",
+    "pdf_url": "https://mc.dlib.nyu.edu/files/books/aub_aco003901/aub_aco003901_lo.pdf",
+    "access": "public_domain"
+  },
+  {
+    "id": "al_tashri_al_jinai_al_islami",
+    "title": "التشريع الجنائي الإسلامي في المذاهب الخمسة مقارنًا بالقانون الوضعي",
+    "author": "عبد القادر عودة",
+    "category": "القانون الجنائي والفقه المقارن",
+    "description": "دراسة مقارنة في التشريع الجنائي الإسلامي والمذاهب الفقهية والقانون الوضعي، ومتاحة حاليًا للقراءة والتنزيل من Arabic Collections Online.",
+    "source": "NYU / Princeton University Libraries",
+    "source_url": "https://sites.dlib.nyu.edu/viewer/books/princeton_aco001568/1?embed=1&lang=ar",
+    "pdf_url": "https://mc.dlib.nyu.edu/files/books/princeton_aco001568/princeton_aco001568_lo.pdf",
+    "access": "public_domain"
+  },
+  {
+    "id": "miftah_al_karama_v1",
+    "title": "مفتاح الكرامة في شرح قواعد العلامة - الجزء الأول",
+    "author": "محمد جواد العاملي",
+    "category": "الفقه والقواعد الفقهية",
+    "description": "مرجع فقهي تراثي، متاح حاليًا للقراءة والتنزيل من Arabic Collections Online.",
+    "source": "NYU / American University of Beirut",
+    "source_url": "https://sites.dlib.nyu.edu/viewer/books/aub_aco001021/display?lang=ar",
+    "pdf_url": "https://mc.dlib.nyu.edu/files/books/aub_aco001021/aub_aco001021_lo.pdf",
+    "access": "public_domain"
   }
 ]
