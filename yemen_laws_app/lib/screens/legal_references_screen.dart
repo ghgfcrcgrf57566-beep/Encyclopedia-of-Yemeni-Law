@@ -27,7 +27,7 @@ class LegalReferencesScreen extends StatefulWidget {
 }
 
 class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
-  static const _cacheKey = 'cached_legal_references_json_v6';
+  static const _cacheKey = 'cached_legal_references_json_v7';
   final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 15),
     receiveTimeout: const Duration(seconds: 90),
@@ -68,8 +68,7 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
 
   bool _isValidReference(Map<String, dynamic> item) {
     final pdf = '${item['pdf_url'] ?? ''}'.trim();
-    if (pdf.isEmpty) return false;
-    return Uri.tryParse(pdf)?.hasScheme == true;
+    return pdf.isNotEmpty && Uri.tryParse(pdf)?.hasScheme == true;
   }
 
   List<Map<String, dynamic>> _mergeUnique(List<List<Map<String, dynamic>>> groups) {
@@ -89,29 +88,44 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
     final id = '${item['id'] ?? ''}'.toLowerCase();
     final title = '${item['title'] ?? ''}';
     final category = '${item['category'] ?? ''}';
-    final text = '$id $title $category';
+    final description = '${item['description'] ?? ''}';
+    final text = '$id $title $category $description'.toLowerCase();
 
-    // قسم الدراسات والأبحاث يبقى فارغًا حاليًا، ولا تُنقل إليه أي كتب تلقائيًا.
-    // الأعمال التي تحمل طابعًا مقارنًا تدخل قسم الدراسات المقارنة فقط.
-    if (text.contains('مقارن') || id.contains('masadir_al_haqq') || id.contains('al_tashri_al_jinai_al_islami')) {
+    // الدراسات المقارنة والأبحاث: لا نترك هذا القسم فارغًا إذا وجدت مادة مناسبة.
+    final comparativeOrResearchIds = <String>{
+      'al_tashri_al_jinai_al_islami',
+      'tarikh_al_tashri_al_islami',
+      'muhadarat_qanun_madani_iraqi_1955',
+    };
+    if (comparativeOrResearchIds.contains(id) ||
+        text.contains('مقارن') ||
+        text.contains('مقارنة') ||
+        text.contains('دراسة مقارنة') ||
+        text.contains('دراسات مقارنة') ||
+        text.contains('أبحاث') ||
+        text.contains('بحث مقارن')) {
       return 'دراسات مقارنة ودراسات وأبحاث';
     }
 
-    if (text.contains('شرح') || text.contains('موسوع') || text.contains('حاشية') || text.contains('فتاوى') || text.contains('المجموع') || text.contains('المبسوط')) {
-      // الكتب الفقهية الأصلية تبقى في المراجع الشرعية، أما الشروح والحواشي والموسوعات فتدخل هنا.
-      if (text.contains('فقه') || text.contains('شرعي') || text.contains('مذهب') || text.contains('فتوى')) {
-        if (text.contains('شرح') || text.contains('حاشية') || text.contains('موسوع')) {
-          return 'شروح وموسوعات';
-        }
-      } else {
-        return 'شروح وموسوعات';
-      }
+    // الشروح والحواشي والموسوعات والمجاميع التي تقوم أساسًا على الشرح والتفسير.
+    if (text.contains('شرح') ||
+        text.contains('شروح') ||
+        text.contains('موسوعة') ||
+        text.contains('موسوعات') ||
+        text.contains('حاشية') ||
+        text.contains('المجموع شرح') ||
+        text.contains('مرآة العقول') ||
+        text.contains('شرح نهج البلاغة') ||
+        text.contains('كشف الأسرار')) {
+      return 'شروح وموسوعات';
     }
 
-    final religiousWords = <String>[
+    // المراجع الشرعية الأصلية والفقهية.
+    const religiousWords = <String>[
       'فقه', 'شرعي', 'الشريعة', 'إسلام', 'الإسلام', 'المذاهب', 'مذهب',
       'أوقاف', 'وقف', 'حديث', 'أصول الفقه', 'قواعد فقهية', 'فتاوى',
-      'الفرائض', 'الحلال والحرام', 'التشريع الإسلامي',
+      'الفرائض', 'الحلال والحرام', 'التشريع الإسلامي', 'الشيعة',
+      'السنة', 'السنّة', 'جعفر الصادق', 'الفقه الإمامي', 'الإمامية',
     ];
     if (religiousWords.any(text.contains)) return 'مراجع شرعية';
 
@@ -135,7 +149,10 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
     for (final pattern in patterns) {
       cleaned = cleaned.replaceAll(pattern, '');
     }
-    return cleaned.replaceAll(RegExp(r'\s{2,}'), ' ').replaceAll(RegExp(r'\s+([،.!؟])'), r'$1').trim();
+    return cleaned
+        .replaceAll(RegExp(r'\s{2,}'), ' ')
+        .replaceAll(RegExp(r'\s+([،.!؟])'), r'$1')
+        .trim();
   }
 
   void _apply(List<Map<String, dynamic>> value) {
@@ -149,13 +166,12 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
   List<Map<String, dynamic>> _filter(String query) {
     final q = query.trim().toLowerCase();
     return _items.where((item) {
-      final inSection = _sectionOf(item) == _section;
-      if (!inSection) return false;
+      if (_sectionOf(item) != _section) return false;
       if (q.isEmpty) return true;
-      return [item['id'], item['title'], item['author'], item['category'], item['description'], item['full_summary']]
-          .join(' ')
-          .toLowerCase()
-          .contains(q);
+      return [
+        item['id'], item['title'], item['author'], item['category'],
+        item['description'], item['full_summary'],
+      ].join(' ').toLowerCase().contains(q);
     }).toList();
   }
 
@@ -166,7 +182,8 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
     });
   }
 
-  String _fileName(Map<String, dynamic> item) => '${item['id'] ?? 'reference'}'.replaceAll(RegExp(r'[^a-zA-Z0-9._-]+'), '_').toLowerCase() + '.pdf';
+  String _fileName(Map<String, dynamic> item) =>
+      '${item['id'] ?? 'reference'}'.replaceAll(RegExp(r'[^a-zA-Z0-9._-]+'), '_').toLowerCase() + '.pdf';
 
   Future<File> _file(Map<String, dynamic> item) async {
     final root = await getApplicationDocumentsDirectory();
@@ -191,7 +208,11 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
         _dio.get<String>(kLegalReferencesAdditionalIndexUrl),
         _dio.get<String>(kLegalReferencesReligiousIndexUrl),
       ]);
-      final groups = responses.map((response) => response.statusCode == 200 && response.data != null ? _parse(response.data!) : <Map<String, dynamic>>[]).toList();
+      final groups = responses
+          .map((response) => response.statusCode == 200 && response.data != null
+              ? _parse(response.data!)
+              : <Map<String, dynamic>>[])
+          .toList();
       final merged = _mergeUnique(groups);
       if (merged.isNotEmpty) {
         await prefs.setString(_cacheKey, jsonEncode(merged));
@@ -224,9 +245,15 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
     final temp = File('${file.path}.part');
     if (mounted) setState(() => _progress[id] = 0);
     try {
-      await _dio.download(url, temp.path, deleteOnError: true, options: Options(followRedirects: true, maxRedirects: 5), onReceiveProgress: (received, total) {
-        if (mounted && total > 0) setState(() => _progress[id] = received / total);
-      });
+      await _dio.download(
+        url,
+        temp.path,
+        deleteOnError: true,
+        options: Options(followRedirects: true, maxRedirects: 5),
+        onReceiveProgress: (received, total) {
+          if (mounted && total > 0) setState(() => _progress[id] = received / total);
+        },
+      );
       if (!await temp.exists()) throw const FileSystemException('download_failed');
       if (await file.exists()) await file.delete();
       await temp.rename(file.path);
@@ -255,7 +282,10 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
         maxChildSize: 0.92,
         expand: false,
         builder: (_, controller) => Container(
-          decoration: const BoxDecoration(color: Color(0xFF1E1A16), borderRadius: BorderRadius.vertical(top: Radius.circular(26))),
+          decoration: const BoxDecoration(
+            color: Color(0xFF1E1A16),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+          ),
           child: ListView(
             controller: controller,
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
@@ -267,7 +297,8 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
                 Expanded(child: Text(title, textAlign: TextAlign.right, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w800, height: 1.35))),
               ]),
               const SizedBox(height: 18),
-              if (author.isNotEmpty || category.isNotEmpty) Text([author, category].where((e) => e.isNotEmpty).join(' — '), textAlign: TextAlign.right, style: const TextStyle(color: Color(0xFFD4AF37), fontSize: 14, fontWeight: FontWeight.w700)),
+              if (author.isNotEmpty || category.isNotEmpty)
+                Text([author, category].where((e) => e.isNotEmpty).join(' — '), textAlign: TextAlign.right, style: const TextStyle(color: Color(0xFFD4AF37), fontSize: 14, fontWeight: FontWeight.w700)),
               const SizedBox(height: 18),
               const Text('نبذة عن الكتاب', textAlign: TextAlign.right, style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
               const SizedBox(height: 10),
@@ -285,7 +316,17 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
     const gold = Color(0xFFD4AF37);
     final url = '${item['cover_image_url'] ?? ''}'.trim();
     final valid = url.isNotEmpty && Uri.tryParse(url)?.hasScheme == true;
-    return ClipRRect(borderRadius: BorderRadius.circular(12), child: Container(width: width, height: height, color: const Color(0xFF302319), child: valid ? CachedNetworkImage(imageUrl: url, fit: BoxFit.cover, placeholder: (_, __) => const Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: gold))), errorWidget: (_, __, ___) => const Icon(Icons.menu_book_rounded, color: gold, size: 30)) : const Icon(Icons.menu_book_rounded, color: gold, size: 30)));
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: width,
+        height: height,
+        color: const Color(0xFF302319),
+        child: valid
+            ? CachedNetworkImage(imageUrl: url, fit: BoxFit.cover, placeholder: (_, __) => const Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: gold))), errorWidget: (_, __, ___) => const Icon(Icons.menu_book_rounded, color: gold, size: 30))
+            : const Icon(Icons.menu_book_rounded, color: gold, size: 30),
+      ),
+    );
   }
 
   void _openPdf(String path, String title) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => _ReferencePdfViewer(filePath: path, title: title)));
@@ -312,15 +353,15 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
   Widget build(BuildContext context) {
     const gold = Color(0xFFD4AF37);
     const surface = Color(0xFF1A1A1A);
-    final emptyStudies = _section == 'دراسات مقارنة ودراسات وأبحاث' && _filtered.isEmpty && _query.trim().isEmpty;
+    final sectionCount = _items.where((e) => _sectionOf(e) == _section).length;
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
       appBar: AppBar(backgroundColor: surface, title: const Text('المراجع القانونية', style: TextStyle(color: Color(0xFFF0D78A), fontWeight: FontWeight.w800)), centerTitle: true, iconTheme: const IconThemeData(color: gold)),
       body: Column(children: [
-        Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 8), child: TextField(controller: _search, onChanged: (value) => setState(() { _query = value; _filtered = _filter(value); }), textAlign: TextAlign.right, style: const TextStyle(color: Colors.white), decoration: InputDecoration(hintText: 'ابحث باسم الكتاب أو المؤلف...', hintStyle: const TextStyle(color: Colors.white38), prefixIcon: const Icon(Icons.search_rounded, color: gold), filled: true, fillColor: surface, border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(16)), borderSide: BorderSide.none)))),
+        Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 8), child: TextField(controller: _search, onChanged: (value) => setState(() { _query = value; _filtered = _filter(value); }), textAlign: TextAlign.right, style: const TextStyle(color: Colors.white), decoration: InputDecoration(hintText: 'ابحث باسم الكتاب أو المؤلف...', hintStyle: const TextStyle(color: Colors.white38), prefixIcon: const Icon(Icons.search_rounded, color: gold), filled: true, fillColor: surface, border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(16)), borderSide: BorderSide.none)))),
         SizedBox(height: 54, child: ListView.separated(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6), scrollDirection: Axis.horizontal, itemCount: _sections.length, separatorBuilder: (_, __) => const SizedBox(width: 8), itemBuilder: (_, i) => _sectionChip(_sections[i]))),
-        Padding(padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 3), child: Row(children: [Expanded(child: Text('${_filtered.length} من أصل ${_items.where((e) => _sectionOf(e) == _section).length} مرجع', style: const TextStyle(color: Colors.white54, fontSize: 12))), Text(_source, style: const TextStyle(color: gold, fontSize: 11.5))])),
-        Expanded(child: _loading ? const Center(child: CircularProgressIndicator(color: gold)) : emptyStudies ? const Center(child: Padding(padding: EdgeInsets.all(30), child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.science_outlined, color: gold, size: 48), SizedBox(height: 12), Text('لا توجد دراسات أو أبحاث مضافة حاليًا', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 15, fontWeight: FontWeight.w700)), SizedBox(height: 6), Text('سيتم إضافة الدراسات والأبحاث والمراجع المقارنة المناسبة لاحقًا.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white38, height: 1.5))])) : _filtered.isEmpty ? const Center(child: Text('لا توجد نتائج مطابقة', style: TextStyle(color: Colors.white70))) : RefreshIndicator(color: gold, onRefresh: _loadIndex, child: ListView.builder(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), itemCount: _filtered.length, itemBuilder: (_, index) {
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 3), child: Row(children: [Expanded(child: Text('${_filtered.length} من أصل $sectionCount مرجع', style: const TextStyle(color: Colors.white54, fontSize: 12))), Text(_source, style: const TextStyle(color: gold, fontSize: 11.5))])),
+        Expanded(child: _loading ? const Center(child: CircularProgressIndicator(color: gold)) : _filtered.isEmpty ? Center(child: Padding(padding: const EdgeInsets.all(30), child: Text(_query.trim().isEmpty ? 'لا توجد مراجع مضافة في هذا القسم حاليًا' : 'لا توجد نتائج مطابقة', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)))) : RefreshIndicator(color: gold, onRefresh: _loadIndex, child: ListView.builder(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), itemCount: _filtered.length, itemBuilder: (_, index) {
           final item = _filtered[index];
           final id = '${item['id']}';
           final progress = _progress[id];
