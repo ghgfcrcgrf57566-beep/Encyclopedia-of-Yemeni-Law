@@ -33,6 +33,11 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Set up Gradle 8.14
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14'
+
       - name: Create Android local.properties
         run: echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
 
@@ -40,11 +45,12 @@ jobs:
         run: |
           set -e
           if [ ! -s android/gradle/wrapper/gradle-wrapper.jar ]; then
-            echo "Missing gradle-wrapper.jar; regenerating wrapper with Gradle 8.14."
+            echo "Missing gradle-wrapper.jar; generating it with Gradle 8.14."
             cd android
-            gradle wrapper --gradle-version 8.14
+            gradle wrapper --gradle-version 8.14 --distribution-type all
           fi
           test -s android/gradle/wrapper/gradle-wrapper.jar
+          grep -q 'gradle-8\.14-all\.zip' android/gradle/wrapper/gradle-wrapper.properties
 
       - name: Verify Flutter and Android toolchain
         run: flutter doctor -v || true
