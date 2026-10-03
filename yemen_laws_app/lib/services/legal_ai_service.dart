@@ -45,7 +45,6 @@ class LegalAiService {
     final q = question.trim();
     if (q.isEmpty) throw const LegalAiException('اكتب سؤالك القانوني أولاً.');
 
-    // قاعدة القوانين المحلية هي المصدر الأول والحصري عند وجود تطابق.
     final local = await _searchLocalFirst(q);
     if (local.isNotEmpty) {
       final answer = _buildLocalAnswer(local);
@@ -53,12 +52,12 @@ class LegalAiService {
       return LegalAiResult(answer: answer, sources: local.map(LegalAiSource.fromMadda).toList(), conversationId: conversationId, responseSource: 'local_db');
     }
 
-    // Gemini لا يستعمل إلا كمسار احتياطي عند عدم العثور على مادة محلية.
     if (AppConfig.geminiApiKey.trim().isEmpty) {
-      const answer = 'لم أجد مادة مرتبطة مباشرة بسؤالك في قاعدة القوانين المحلية.';
+      const answer = 'لم أجد مادة قانونية مرتبطة مباشرة بسؤالك في قاعدة القوانين المحلية، ولم يتم تشغيل Gemini لأن مفتاحه غير مُعد.';
       await _saveHistory(q, answer, 'local_db_empty');
       return LegalAiResult(answer: answer, sources: const [], conversationId: conversationId, responseSource: 'local_db_empty');
     }
+
     final answer = await _askGeminiFallback(q, history);
     await _saveHistory(q, answer, 'gemini_ai_fallback');
     return LegalAiResult(answer: answer, sources: const [], conversationId: conversationId, responseSource: 'gemini_ai_fallback');
@@ -66,65 +65,103 @@ class LegalAiService {
 
   Future<List<Madda>> _searchLocalFirst(String q) async {
     final laws = await _lawsRepository.getAllLaws();
-    final law = _findLaw(laws, q);
-    final terms = _terms(q);
+    final scope = _detectLegalScope(laws, q);
+    final terms = _terms(q, scope);
+    if (terms.isEmpty) return [];
+
     final found = <Madda>[];
     final seen = <int>{};
-    Future<void> add(String term, int? lawId) async {
-      if (term.trim().length < 2) return;
+
+    Future<void> addTerm(String term, {int? lawId}) async {
+      if (term.length < 2) return;
       try {
-        final rows = await _lawsRepository.search(term, lawId: lawId, limit: 20);
-        for (final m in rows) { if (seen.add(m.id)) found.add(m); }
+        final rows = await _lawsRepository.search(term, lawId: lawId, limit: 30);
+        for (final m in rows) {
+          if (seen.add(m.id)) found.add(m);
+        }
       } catch (_) {}
     }
-    if (law != null) {
-      for (final term in terms) { await add(term, law.id); if (found.length >= 40) break; }
+
+    // إذا عُرف مجال السؤال، لا نبحث في جميع القوانين. هذا يمنع كلمات عامة مثل
+    // "شروط" من سحب مواد من الدستور أو القانون التجاري لمجرد أنها تحتوي الكلمة.
+    if (scope != null) {
+      for (final term in terms) {
+        await addTerm(term, lawId: scope.lawId);
+        if (found.length >= 80) break;
+      }
+    } else {
+      // الأسئلة التي لا يمكن تصنيفها لا تحصل على نتائج عشوائية من كلمة عامة.
+      // نطلب تطابقاً مباشراً للسؤال أولاً فقط.
+      try {
+        final direct = await _lawsRepository.search(q, limit: 20);
+        for (final m in direct) if (seen.add(m.id)) found.add(m);
+      } catch (_) {}
     }
-    if (found.isEmpty) {
-      for (final term in terms) { await add(term, null); if (found.length >= 60) break; }
-    }
+
     if (found.isEmpty) return [];
-    final normalizedTerms = terms.map(_normalize).where((e) => e.length >= 2).toSet();
-    final scored = <MapEntry<Madda,int>>[];
+
+    final scored = <_ScoredMadda>[];
     for (final m in found) {
       final text = _normalize('${m.lawName ?? ''} ${m.number} ${m.babLabel ?? ''} ${m.faslLabel ?? ''} ${m.body}');
-      var score = law != null && m.lawId == law.id ? 10 : 0;
-      for (final term in normalizedTerms) { if (text.contains(term)) score += term.length >= 4 ? 3 : 1; }
-      if (score >= (law == null ? 3 : 8)) scored.add(MapEntry(m, score));
+      var score = 0;
+      var matchedCore = false;
+      for (final term in terms) {
+        final t = _normalize(term);
+        if (t.length < 2) continue;
+        if (text.contains(t)) {
+          score += t.length >= 4 ? 5 : 2;
+          if (scope != null && scope.coreTerms.any((c) => _normalize(c) == t)) matchedCore = true;
+        }
+      }
+      if (scope != null && m.lawId == scope.lawId) score += 20;
+      if (scope != null && !matchedCore) continue;
+      // لا نعرض نتيجة لمجرد تطابق كلمة عامة مثل "شروط" أو "ما".
+      if (score < (scope != null ? 25 : 8)) continue;
+      scored.add(_ScoredMadda(m, score));
     }
-    scored.sort((a,b) => b.value.compareTo(a.value));
-    return scored.take(8).map((e) => e.key).toList();
+
+    scored.sort((a, b) => b.score.compareTo(a.score));
+    return scored.take(8).map((e) => e.madda).toList();
   }
 
-  Law? _findLaw(List<Law> laws, String question) {
+  _LegalScope? _detectLegalScope(List<Law> laws, String question) {
     final q = _normalize(question);
-    final groups = <List<String>>[
-      ['طلاق','فسخ','خلع','زواج','نكاح','زوج','زوجة','مهر','عدة','نفقة','حضانة','نسب'],
-      ['عمل','عامل','موظف','اجازه','اجازة','أجر','راتب','فصل تعسفي'],
-      ['تجاري','تجارة','تاجر','شركة','شركات','افلاس'],
-      ['جريمة','عقوبة','قصاص','جناية','جنحة'],
-      ['اجراءات جزائية','إجراءات جزائية','تحقيق','نيابة','محاكمة جزائية'],
-      ['مرافعات','اجراءات مدنية','إجراءات مدنية','دعوى','استئناف','تنفيذ مدني'],
-      ['اثبات','إثبات','بينة','شهادة','يمين'], ['تحكيم','محكم'], ['صحافة','مطبوعات','نشر'],
-      ['مرور','سيارة','مركبة','قيادة'], ['صيدلة','صيدلي','دواء','صيدلية'], ['محاماة','محامي','محام'],
-      ['اوقاف','أوقاف','وقف'], ['سجون','سجن','مسجون'], ['اراضي الدولة','أراضي الدولة','املاك الدولة','أملاك الدولة'],
+    final definitions = <_ScopeDefinition>[
+      _ScopeDefinition(['طلاق','فسخ','خلع','زواج','نكاح','زوج','زوجة','مهر','عدة','نفقة','حضانة','نسب'], ['احوال شخصية','الأحوال الشخصية','شخصية']),
+      _ScopeDefinition(['عمل','عامل','عمال','موظف','اجازه','اجازة','أجر','راتب','فصل تعسفي','صاحب العمل'], ['عمل','العمل']),
+      _ScopeDefinition(['تجاري','تجارة','تاجر','شركة','شركات','افلاس','إفلاس','سجل تجاري'], ['تجاري','التجارة','الشركات']),
+      _ScopeDefinition(['جريمة','عقوبة','قصاص','جناية','جنحة','قتل','سرقة'], ['جرائم','العقوبات','العقوبات']),
+      _ScopeDefinition(['اجراءات جزائية','إجراءات جزائية','تحقيق','نيابة','محاكمة جزائية','ضبط'], ['إجراءات جزائية','الإجراءات الجزائية']),
+      _ScopeDefinition(['مرافعات','اجراءات مدنية','إجراءات مدنية','دعوى','استئناف','تنفيذ مدني','حجز'], ['مرافعات','التنفيذ المدني']),
+      _ScopeDefinition(['اثبات','إثبات','بينة','شهادة','يمين','إقرار','محرر'], ['إثبات']),
+      _ScopeDefinition(['تحكيم','محكم','محكمين'], ['تحكيم']),
+      _ScopeDefinition(['صحافة','مطبوعات','نشر','صحفي'], ['صحافة','المطبوعات']),
+      _ScopeDefinition(['مرور','سيارة','مركبة','قيادة','رخصة'], ['مرور']),
+      _ScopeDefinition(['صيدلة','صيدلي','دواء','صيدلية'], ['مزاولة المهن الطبية','المهن الطبية','صيدلة']),
+      _ScopeDefinition(['محاماة','محامي','محام'], ['المحاماة','مهنة المحاماة']),
+      _ScopeDefinition(['اوقاف','أوقاف','وقف'], ['وقف','الأوقاف']),
+      _ScopeDefinition(['سجون','سجن','مسجون'], ['السجون']),
+      _ScopeDefinition(['اراضي الدولة','أراضي الدولة','املاك الدولة','أملاك الدولة','عقارات الدولة'], ['أراضي وعقارات الدولة','أراضي الدولة','عقارات الدولة']),
     ];
-    for (final group in groups) {
-      if (!group.any((h) => q.contains(_normalize(h)))) continue;
-      for (final law in laws) {
-        final name = _normalize(law.name);
-        if (group.any((h) => name.contains(_normalize(h)))) return law;
+
+    for (final d in definitions) {
+      final matched = d.coreTerms.where((t) => q.contains(_normalize(t))).toList();
+      if (matched.isEmpty) continue;
+      Law? law;
+      for (final candidate in laws) {
+        final name = _normalize(candidate.name);
+        if (d.lawHints.any((h) => name.contains(_normalize(h)))) { law = candidate; break; }
       }
+      if (law != null) return _LegalScope(law.id, matched, d.coreTerms);
     }
-    for (final law in laws) { final name = _normalize(law.name); if (name.length >= 4 && q.contains(name)) return law; }
     return null;
   }
 
-  List<String> _terms(String q) {
+  List<String> _terms(String q, _LegalScope? scope) {
     final words = _normalize(q).split(RegExp(r'\s+')).where((w) => w.length >= 2 && !_stopWords.contains(w)).toList();
-    final result = <String>{...words};
-    final synonyms = <String,List<String>>{'طلاق':['طلاق','الطلاق'],'فسخ':['فسخ','فسخ الزواج','فسخ النكاح'],'خلع':['خلع','مخالعة'],'زواج':['زواج','نكاح','عقد الزواج'],'زوجة':['زوجة','الزوجة'],'زوج':['زوج','الزوج'],'عدة':['عدة','العدة'],'نفقة':['نفقة','النفقة'],'حضانة':['حضانة','الحضانة']};
-    for (final w in words) { final s = synonyms[w]; if (s != null) result.addAll(s.map(_normalize)); }
+    final result = <String>{};
+    if (scope != null) result.addAll(scope.coreTerms.where((t) => q.contains(t)).map(_normalize));
+    result.addAll(words.where((w) => !_genericTerms.contains(w)));
     return result.take(12).toList();
   }
 
@@ -132,14 +169,15 @@ class LegalAiService {
 
   String _buildLocalAnswer(List<Madda> matches) {
     final b = StringBuffer('وجدت النصوص القانونية المرتبطة بسؤالك في قاعدة القوانين المحلية:\n\n');
-    for (var i=0;i<matches.length;i++) {
-      final m=matches[i]; final law=m.lawName?.trim();
-      b.writeln('${i+1}. ${law?.isNotEmpty == true ? law : 'القوانين اليمنية'}');
+    for (var i = 0; i < matches.length; i++) {
+      final m = matches[i];
+      final law = m.lawName?.trim();
+      b.writeln('${i + 1}. ${law?.isNotEmpty == true ? law : 'القوانين اليمنية'}');
       b.writeln('المادة ${m.number}');
       if (m.babLabel?.trim().isNotEmpty == true) b.writeln('الباب: ${m.babLabel!.trim()}');
       if (m.faslLabel?.trim().isNotEmpty == true) b.writeln('الفصل: ${m.faslLabel!.trim()}');
       b.writeln(m.body.trim());
-      if (i < matches.length-1) b.writeln('\n---\n');
+      if (i < matches.length - 1) b.writeln('\n---\n');
     }
     return b.toString().trim();
   }
@@ -149,29 +187,68 @@ class LegalAiService {
     final uri = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent');
     final contents = <Map<String,dynamic>>[];
     for (final item in history.take(8)) {
-      final text=item['content']?.trim() ?? ''; if (text.isEmpty) continue;
-      contents.add({'role': item['role']=='assistant' ? 'model' : 'user','parts':[{'text':_stripMarkdown(text)}]});
+      final text = item['content']?.trim() ?? '';
+      if (text.isEmpty) continue;
+      contents.add({'role': item['role'] == 'assistant' ? 'model' : 'user', 'parts': [{'text': _stripMarkdown(text)}]});
     }
-    contents.add({'role':'user','parts':[{'text':'أنت مساعد قانوني داخل موسوعة القانون اليمني. تم البحث أولاً في قاعدة القوانين المحلية ولم توجد مادة مباشرة، ولذلك أنت مسار احتياطي فقط. السؤال: $q\nأجب بالعربية بوضوح. لا تنسب نصاً إلى قانون يمني محدد ما لم يكن النص متاحاً لك. إذا كان السؤال يحتاج نصاً يمنياً محدداً فاذكر أن قاعدة التطبيق لم تجد مادة مباشرة. لا تستخدم Markdown مثل # أو ** أو `.'} ]});
+    contents.add({'role': 'user', 'parts': [{'text': 'أنت مساعد قانوني داخل موسوعة القانون اليمني. تم البحث أولاً في قاعدة القوانين المحلية ولم توجد مادة مباشرة، ولذلك أنت مسار احتياطي فقط. السؤال: $q\nأجب بالعربية بوضوح. لا تنسب نصاً إلى قانون يمني محدد ما لم يكن النص متاحاً لك. إذا كان السؤال يحتاج نصاً يمنياً محدداً فاذكر أن قاعدة التطبيق لم تجد مادة مباشرة. لا تستخدم Markdown مثل # أو ** أو `.'}]});
     http.Response response;
     try {
-      response=await http.post(uri,headers:{'Content-Type':'application/json','Accept':'application/json','x-goog-api-key':AppConfig.geminiApiKey.trim()},body:jsonEncode({'systemInstruction':{'parts':[{'text':'أنت مساعد قانوني عربي. كن دقيقاً ولا تختلق نصوصاً قانونية ولا تستخدم Markdown.'}]},'contents':contents}));
-    } catch (_) { throw const LegalAiException('تعذر الاتصال بالمساعد الذكي. تحقق من اتصال الإنترنت أو مفتاح Gemini.'); }
-    Map<String,dynamic> body={}; try { final d=jsonDecode(response.body); if(d is Map<String,dynamic>) body=d; } catch (_) {}
-    if(response.statusCode!=200) throw LegalAiException(_apiError(body) ?? 'تعذر الحصول على إجابة من Gemini حالياً.');
-    final answer=_generatedText(body); if(answer.isEmpty) throw const LegalAiException('تعذر توليد إجابة من المساعد الذكي.');
+      response = await http.post(uri, headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'x-goog-api-key': AppConfig.geminiApiKey.trim()}, body: jsonEncode({'systemInstruction': {'parts': [{'text': 'أنت مساعد قانوني عربي. كن دقيقاً ولا تختلق نصوصاً قانونية ولا تستخدم Markdown.'}]}, 'contents': contents}));
+    } catch (_) {
+      throw const LegalAiException('تعذر الاتصال بالمساعد الذكي. تحقق من اتصال الإنترنت أو مفتاح Gemini.');
+    }
+    Map<String,dynamic> body = {};
+    try { final d = jsonDecode(response.body); if (d is Map<String,dynamic>) body = d; } catch (_) {}
+    if (response.statusCode != 200) throw LegalAiException(_apiError(body) ?? 'تعذر الحصول على إجابة من Gemini حالياً.');
+    final answer = _generatedText(body);
+    if (answer.isEmpty) throw const LegalAiException('تعذر توليد إجابة من المساعد الذكي.');
     return _stripMarkdown(answer);
   }
 
   String _generatedText(Map<String,dynamic> body) {
-    final candidates=body['candidates']; if(candidates is! List || candidates.isEmpty) return '';
-    final first=candidates.first; if(first is! Map) return ''; final content=first['content']; if(content is! Map) return '';
-    final parts=content['parts']; if(parts is! List) return '';
-    return parts.whereType<Map>().map((p)=>p['text']?.toString() ?? '').where((s)=>s.trim().isNotEmpty).join('\n').trim();
+    final candidates = body['candidates'];
+    if (candidates is! List || candidates.isEmpty) return '';
+    final first = candidates.first;
+    if (first is! Map) return '';
+    final content = first['content'];
+    if (content is! Map) return '';
+    final parts = content['parts'];
+    if (parts is! List) return '';
+    return parts.whereType<Map>().map((p) => p['text']?.toString() ?? '').where((s) => s.trim().isNotEmpty).join('\n').trim();
   }
-  String? _apiError(Map<String,dynamic> body) { final e=body['error']; if(e is Map){ final m=e['message']?.toString().trim(); if(m?.isNotEmpty==true)return m; } return null; }
-  String _stripMarkdown(String s) => s.replaceAll(RegExp(r'```[\s\S]*?```'),'').replaceAll(RegExp(r'(^|\n)\s*#{1,6}\s*'),r'$1').replaceAll('**','').replaceAll('__','').replaceAll('`','').trim();
-  Future<void> _saveHistory(String q,String answer,String source) async { try { await _historyDb.addSearch(query:q,response:answer,source:source); } catch (_) {} }
+
+  String? _apiError(Map<String,dynamic> body) {
+    final e = body['error'];
+    if (e is Map) {
+      final m = e['message']?.toString().trim();
+      if (m?.isNotEmpty == true) return m;
+    }
+    return null;
+  }
+
+  String _stripMarkdown(String s) => s.replaceAll(RegExp(r'```[\s\S]*?```'), '').replaceAll(RegExp(r'(^|\n)\s*#{1,6}\s*'), r'$1').replaceAll('**', '').replaceAll('__', '').replaceAll('`', '').trim();
+  Future<void> _saveHistory(String q, String answer, String source) async { try { await _historyDb.addSearch(query: q, response: answer, source: source); } catch (_) {} }
+}
+
+class _ScoredMadda {
+  final Madda madda;
+  final int score;
+  const _ScoredMadda(this.madda, this.score);
+}
+
+class _ScopeDefinition {
+  final List<String> coreTerms;
+  final List<String> lawHints;
+  const _ScopeDefinition(this.coreTerms, this.lawHints);
+}
+
+class _LegalScope {
+  final int lawId;
+  final List<String> matchedTerms;
+  final List<String> coreTerms;
+  const _LegalScope(this.lawId, this.matchedTerms, this.coreTerms);
 }
 
 const Set<String> _stopWords = {'ما','ماذا','هل','هو','هي','هذا','هذه','ذلك','تلك','من','في','فيه','عن','على','الى','إلى','مع','لي','لدي','اريد','أريد','يمكن','كيف','متى','أين','اين','ماهي','وما'};
+const Set<String> _genericTerms = {'شروط','شرط','حالات','حاله','حالة','جميع','ماهي','ماهى','ماهي','هي','هو','ما','هل','كيف','متى','من','في','عن','على','الى','إلى','ما','وما'};
