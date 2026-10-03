@@ -48,18 +48,21 @@ class LegalAiService {
     List<Map<String, String>> history = const [],
     String lawScope = 'الكل',
   }) async {
-    final q = question.trim();
-    if (q.isEmpty) throw const LegalAiException('اكتب سؤالك القانوني أولاً.');
+    final raw = question.trim();
+    if (raw.isEmpty) throw const LegalAiException('اكتب سؤالك القانوني أولاً.');
     if (AppConfig.geminiApiKey.trim().isEmpty) {
       throw const LegalAiException('لا يمكن إرسال الإجابة قبل أن يبحث فيها Gemini. مفتاح Gemini غير مُعد.');
     }
 
+    // الواجهة الحالية تمرر أحياناً السؤال مع تعليمات وضع الإجابة واسم الفلتر.
+    // نفصل السؤال الحقيقي والنطاق هنا حتى لا تدخل تعليمات الواجهة في بحث SQLite.
+    final q = _extractUserQuestion(raw);
+    final requestedScope = lawScope == 'الكل' ? _extractLawScope(raw) : lawScope;
     final laws = await _lawsRepository.getAllLaws();
-    final selectedLaw = await _resolveLawScope(laws, lawScope);
+    final selectedLaw = await _resolveLawScope(laws, requestedScope);
 
-    // Gemini هو من يحدد كيف يبحث: يقرأ السؤال والنطاق ويقترح عبارات بحث دقيقة.
-    // بعدها نبحث بهذه العبارات داخل قاعدة التطبيق، ثم نعطي النتائج إلى Gemini ليصوغ الإجابة.
-    final plan = await _planSearchWithGemini(q, lawScope, history);
+    // Gemini هو محرك البحث: يحدد عبارات البحث والقانون المقصود، ثم نستخدم قاعدة التطبيق كمصدر يمكنه البحث داخله.
+    final plan = await _planSearchWithGemini(q, requestedScope, history);
     final queries = <String>{
       ...plan.queries.where((v) => v.trim().isNotEmpty),
       q,
@@ -75,20 +78,20 @@ class LegalAiService {
       if (candidates.length >= 40) break;
     }
 
-    final ranked = await _rankLocalCandidatesWithGemini(q, lawScope, candidates, history);
+    final ranked = await _rankLocalCandidatesWithGemini(q, requestedScope, candidates, history);
     if (ranked.isNotEmpty) {
-      final answer = await _answerFromLocalWithGemini(q, lawScope, ranked, history);
-      final review = await _reviewFinalAnswerWithGemini(q, lawScope, answer, ranked, history);
+      final answer = await _answerFromLocalWithGemini(q, requestedScope, ranked, history);
+      final review = await _reviewFinalAnswerWithGemini(q, requestedScope, answer, ranked, history);
       if (review.isMatch) {
         await _saveHistory(q, answer, 'gemini_search_local_db');
         return LegalAiResult(answer: answer, sources: ranked.map(LegalAiSource.fromMadda).toList(), conversationId: conversationId, responseSource: 'gemini_search_local_db');
       }
     }
 
-    // إذا لم يجد Gemini نصاً مناسباً داخل قاعدة التطبيق، يسمح له بالبحث من معرفته القانونية.
-    // هذا هو المسار الاحتياطي، مع مراجعة نهائية إلزامية قبل الإرسال.
-    final generated = await _answerFromGeminiKnowledge(q, lawScope, history);
-    final generatedReview = await _reviewFinalAnswerWithGemini(q, lawScope, generated, const [], history);
+    // إذا لم يجد Gemini نصاً مناسباً داخل قاعدة التطبيق، ينتقل إلى معرفته القانونية.
+    // وتبقى المراجعة النهائية إلزامية قبل الإرسال.
+    final generated = await _answerFromGeminiKnowledge(q, requestedScope, history);
+    final generatedReview = await _reviewFinalAnswerWithGemini(q, requestedScope, generated, const [], history);
     if (!generatedReview.isMatch) {
       const answer = 'لم يعتمد Gemini إجابة مرتبطة بما يكفي بسؤالك، لذلك لم يتم إرسال إجابة غير موثوقة.';
       await _saveHistory(q, answer, 'gemini_rejected');
@@ -97,6 +100,22 @@ class LegalAiService {
 
     await _saveHistory(q, generated, 'gemini_search_knowledge');
     return LegalAiResult(answer: generated, sources: const [], conversationId: conversationId, responseSource: 'gemini_search_knowledge');
+  }
+
+  String _extractUserQuestion(String raw) {
+    final marker = 'السؤال القانوني:';
+    final index = raw.lastIndexOf(marker);
+    if (index >= 0) {
+      final value = raw.substring(index + marker.length).trim();
+      if (value.isNotEmpty) return value;
+    }
+    return raw;
+  }
+
+  String _extractLawScope(String raw) {
+    final match = RegExp(r'نطاق البحث الإلزامي:\s*(.+?)\s*فقط').firstMatch(raw);
+    if (match != null && match.group(1)?.trim().isNotEmpty == true) return match.group(1)!.trim();
+    return 'الكل';
   }
 
   Future<Law?> _resolveLawScope(List<Law> laws, String scope) async {
@@ -233,9 +252,7 @@ match=true فقط إذا كانت الإجابة مرتبطة مباشرة با�
       'generationConfig': {'temperature': temperature, 'responseMimeType': 'text/plain'},
     })).timeout(const Duration(seconds: 45));
 
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw LegalAiException(_apiError(response.statusCode, response.body));
-    }
+    if (response.statusCode < 200 || response.statusCode >= 300) throw LegalAiException(_apiError(response.statusCode, response.body));
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     final candidates = data['candidates'] as List<dynamic>? ?? const [];
     if (candidates.isEmpty) throw const LegalAiException('لم يُرجع Gemini إجابة.');
@@ -257,17 +274,13 @@ match=true فقط إذا كانت الإجابة مرتبطة مباشرة با�
 
   List<int> _parseIntList(String raw, String key) {
     final json = _extractJson(raw);
-    if (json is Map<String, dynamic>) {
-      return (json[key] as List<dynamic>?)?.map((e) => int.tryParse(e.toString())).whereType<int>().toList() ?? const [];
-    }
+    if (json is Map<String, dynamic>) return (json[key] as List<dynamic>?)?.map((e) => int.tryParse(e.toString())).whereType<int>().toList() ?? const [];
     return const [];
   }
 
   _GeminiReview _parseReview(String raw) {
     final json = _extractJson(raw);
-    if (json is Map<String, dynamic>) {
-      return _GeminiReview(json['match'] == true, (json['reason'] ?? '').toString());
-    }
+    if (json is Map<String, dynamic>) return _GeminiReview(json['match'] == true, (json['reason'] ?? '').toString());
     final normalized = raw.toLowerCase();
     return _GeminiReview(normalized.contains('"match":true') || normalized.contains('"match": true'), raw);
   }
@@ -277,20 +290,16 @@ match=true فقط إذا كانت الإجابة مرتبطة مباشرة با�
     if (value.startsWith('```')) {
       value = value.replaceFirst(RegExp(r'^```(?:json)?\s*'), '').replaceFirst(RegExp(r'\s*```$'), '').trim();
     }
-    try {
-      return jsonDecode(value);
-    } catch (_) {
-      final start = value.indexOf('{');
-      final end = value.lastIndexOf('}');
-      if (start >= 0 && end > start) {
-        try { return jsonDecode(value.substring(start, end + 1)); } catch (_) {}
-      }
+    try { return jsonDecode(value); } catch (_) {}
+    final start = value.indexOf('{');
+    final end = value.lastIndexOf('}');
+    if (start >= 0 && end > start) {
+      try { return jsonDecode(value.substring(start, end + 1)); } catch (_) {}
     }
     return null;
   }
 
   String _normalize(String s) => s.toLowerCase().replaceAll(RegExp(r'[ً-ٟ]'), '').replaceAll(RegExp(r'[إأآٱ]'), 'ا').replaceAll('ى', 'ي').replaceAll('ة', 'ه').replaceAll('ـ', '').trim();
-
   String _stripMarkdown(String value) => value.replaceAll(RegExp(r'#{1,6}\s*'), '').replaceAll('**', '').replaceAll('__', '').replaceAll('`', '').trim();
 
   String _apiError(int status, String body) {
