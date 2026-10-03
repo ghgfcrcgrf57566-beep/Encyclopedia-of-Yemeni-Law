@@ -46,11 +46,11 @@ jobs:
           set -e
           if [ ! -s android/gradle/wrapper/gradle-wrapper.jar ]; then
             echo "Missing gradle-wrapper.jar; generating it with Gradle 8.14."
-            cd android
-            gradle wrapper --gradle-version 8.14 --distribution-type all
+            (cd android && gradle wrapper --gradle-version 8.14 --distribution-type all)
           fi
           test -s android/gradle/wrapper/gradle-wrapper.jar
           grep -q 'gradle-8\.14-all\.zip' android/gradle/wrapper/gradle-wrapper.properties
+          echo "Gradle wrapper JAR and properties are valid."
 
       - name: Verify Flutter and Android toolchain
         run: flutter doctor -v || true
