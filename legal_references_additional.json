@@ -1,0 +1,46 @@
+[
+  {
+    "id": "madkhal_sharia_zaydan",
+    "title": "المدخل لدراسة الشريعة الإسلامية",
+    "author": "عبد الكريم زيدان",
+    "category": "الشريعة والقانون",
+    "description": "مرجع تأسيسي في دراسة الشريعة الإسلامية، متاح حاليًا للقراءة والتنزيل بصيغة PDF من Arabic Collections Online.",
+    "source": "NYU / Columbia University Libraries",
+    "source_url": "https://sites.dlib.nyu.edu/viewer/books/columbia_aco003836/display?lang=ar",
+    "pdf_url": "https://mc.dlib.nyu.edu/files/books/columbia_aco003836/columbia_aco003836_lo.pdf",
+    "access": "public_domain"
+  },
+  {
+    "id": "ahkam_al_awqaf",
+    "title": "كتاب أحكام الأوقاف",
+    "author": "أحمد بن عمر الخصاف",
+    "category": "الأوقاف والفقه القانوني",
+    "description": "مرجع تراثي متخصص في أحكام الأوقاف، متاح حاليًا للقراءة والتنزيل بصيغة PDF من Arabic Collections Online.",
+    "source": "NYU / American University in Cairo",
+    "source_url": "https://sites.dlib.nyu.edu/viewer/books/auc_aco000146/1?embed=1&lang=ar",
+    "pdf_url": "https://mc.dlib.nyu.edu/files/books/auc_aco000146/auc_aco000146_lo.pdf",
+    "access": "public_domain"
+  },
+  {
+    "id": "tarikh_al_tashri_al_islami",
+    "title": "تاريخ التشريع الإسلامي",
+    "author": "محمد الخضري",
+    "category": "تاريخ التشريع والفقه الإسلامي",
+    "description": "مرجع في نشأة التشريع الإسلامي وتطوره، متاح حاليًا للتنزيل بصيغة PDF من Arabic Collections Online.",
+    "source": "NYU / American University of Beirut",
+    "source_url": "https://sites.dlib.nyu.edu/viewer/books/aub_aco003901/display?lang=ar",
+    "pdf_url": "https://mc.dlib.nyu.edu/files/books/aub_aco003901/aub_aco003901_lo.pdf",
+    "access": "public_domain"
+  },
+  {
+    "id": "al_tashri_al_jinai_al_islami",
+    "title": "التشريع الجنائي الإسلامي في المذاهب الخمسة مقارنًا بالقانون الوضعي",
+    "author": "عبد القادر عودة",
+    "category": "القانون الجنائي والفقه المقارن",
+    "description": "دراسة مقارنة في التشريع الجنائي الإسلامي والمذاهب الفقهية والقانون الوضعي، متاحة حاليًا للقراءة والتنزيل من Arabic Collections Online.",
+    "source": "NYU / Princeton University Libraries",
+    "source_url": "https://sites.dlib.nyu.edu/viewer/books/princeton_aco001568/1?embed=1&lang=ar",
+    "pdf_url": "https://mc.dlib.nyu.edu/files/books/princeton_aco001568/princeton_aco001568_lo.pdf",
+    "access": "public_domain"
+  }
+]
