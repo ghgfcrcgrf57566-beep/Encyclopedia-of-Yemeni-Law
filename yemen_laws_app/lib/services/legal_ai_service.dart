@@ -45,25 +45,51 @@ class LegalAiService {
     final q = question.trim();
     if (q.isEmpty) throw const LegalAiException('اكتب سؤالك القانوني أولاً.');
 
-    final local = await _searchLocalFirst(q);
-    if (local.isNotEmpty) {
-      final answer = _buildLocalAnswer(local);
-      await _saveHistory(q, answer, 'local_db');
-      return LegalAiResult(answer: answer, sources: local.map(LegalAiSource.fromMadda).toList(), conversationId: conversationId, responseSource: 'local_db');
-    }
-
+    // لا نرسل أي إجابة للمستخدم مباشرة. كل نتيجة محلية يجب أن يراجعها Gemini
+    // مقابل السؤال، وإذا رفضها نعيد البحث قبل الإرسال.
     if (AppConfig.geminiApiKey.trim().isEmpty) {
-      const answer = 'لم أجد مادة قانونية مرتبطة مباشرة بسؤالك في قاعدة القوانين المحلية، ولم يتم تشغيل Gemini لأن مفتاحه غير مُعد.';
-      await _saveHistory(q, answer, 'local_db_empty');
-      return LegalAiResult(answer: answer, sources: const [], conversationId: conversationId, responseSource: 'local_db_empty');
+      throw const LegalAiException('لا يمكن إرسال الإجابة قبل مراجعتها بواسطة Gemini. مفتاح Gemini غير مُعد.');
     }
 
-    final answer = await _askGeminiFallback(q, history);
-    await _saveHistory(q, answer, 'gemini_ai_fallback');
-    return LegalAiResult(answer: answer, sources: const [], conversationId: conversationId, responseSource: 'gemini_ai_fallback');
+    var searchQuestion = q;
+    final rejectedIds = <int>{};
+
+    for (var attempt = 0; attempt < 3; attempt++) {
+      final local = await _searchLocalFirst(searchQuestion, excludeIds: rejectedIds);
+      if (local.isNotEmpty) {
+        final answer = _buildLocalAnswer(local);
+        final review = await _reviewWithGemini(q, answer, local, history);
+        if (review.isMatch) {
+          await _saveHistory(q, answer, 'local_db_gemini_verified');
+          return LegalAiResult(answer: answer, sources: local.map(LegalAiSource.fromMadda).toList(), conversationId: conversationId, responseSource: 'local_db_gemini_verified');
+        }
+        rejectedIds.addAll(local.map((m) => m.id));
+        if (review.searchQuery.trim().isNotEmpty) {
+          searchQuestion = review.searchQuery.trim();
+        } else {
+          searchQuestion = '$q ${review.reason}'.trim();
+        }
+        continue;
+      }
+      break;
+    }
+
+    // إذا لم نجد نصاً محلياً مطابقاً بعد إعادة البحث، يجيب Gemini كمسار احتياطي.
+    // ثم تتم مراجعة إجابته أيضاً قبل إرسالها للمستخدم.
+    final generated = await _askGeminiFallback(q, history);
+    final generatedReview = await _reviewGeneratedAnswerWithGemini(q, generated, history);
+    if (!generatedReview.isMatch) {
+      // لا نرسل إجابة رفضها المراجع. نعطي رسالة واضحة بدلاً من إجابة غير موثوقة.
+      const answer = 'لم أجد في قاعدة القوانين المحلية نصاً مرتبطاً بما يكفي بسؤالك، ولم تعتمد المراجعة الذكية إجابة بديلة لإرسالها.';
+      await _saveHistory(q, answer, 'gemini_review_rejected');
+      return LegalAiResult(answer: answer, sources: const [], conversationId: conversationId, responseSource: 'gemini_review_rejected');
+    }
+
+    await _saveHistory(q, generated, 'gemini_ai_reviewed');
+    return LegalAiResult(answer: generated, sources: const [], conversationId: conversationId, responseSource: 'gemini_ai_reviewed');
   }
 
-  Future<List<Madda>> _searchLocalFirst(String q) async {
+  Future<List<Madda>> _searchLocalFirst(String q, {Set<int> excludeIds = const {}}) async {
     final laws = await _lawsRepository.getAllLaws();
     final scope = _detectLegalScope(laws, q);
     final terms = _terms(q, scope);
@@ -75,26 +101,25 @@ class LegalAiService {
     Future<void> addTerm(String term, {int? lawId}) async {
       if (term.length < 2) return;
       try {
-        final rows = await _lawsRepository.search(term, lawId: lawId, limit: 30);
+        final rows = await _lawsRepository.search(term, lawId: lawId, limit: 40);
         for (final m in rows) {
+          if (excludeIds.contains(m.id)) continue;
           if (seen.add(m.id)) found.add(m);
         }
       } catch (_) {}
     }
 
-    // إذا عُرف مجال السؤال، لا نبحث في جميع القوانين. هذا يمنع كلمات عامة مثل
-    // "شروط" من سحب مواد من الدستور أو القانون التجاري لمجرد أنها تحتوي الكلمة.
     if (scope != null) {
       for (final term in terms) {
         await addTerm(term, lawId: scope.lawId);
-        if (found.length >= 80) break;
+        if (found.length >= 100) break;
       }
     } else {
-      // الأسئلة التي لا يمكن تصنيفها لا تحصل على نتائج عشوائية من كلمة عامة.
-      // نطلب تطابقاً مباشراً للسؤال أولاً فقط.
       try {
-        final direct = await _lawsRepository.search(q, limit: 20);
-        for (final m in direct) if (seen.add(m.id)) found.add(m);
+        final direct = await _lawsRepository.search(q, limit: 30);
+        for (final m in direct) {
+          if (!excludeIds.contains(m.id) && seen.add(m.id)) found.add(m);
+        }
       } catch (_) {}
     }
 
@@ -115,7 +140,6 @@ class LegalAiService {
       }
       if (scope != null && m.lawId == scope.lawId) score += 20;
       if (scope != null && !matchedCore) continue;
-      // لا نعرض نتيجة لمجرد تطابق كلمة عامة مثل "شروط" أو "ما".
       if (score < (scope != null ? 25 : 8)) continue;
       scored.add(_ScoredMadda(m, score));
     }
@@ -182,28 +206,82 @@ class LegalAiService {
     return b.toString().trim();
   }
 
-  Future<String> _askGeminiFallback(String q, List<Map<String,String>> history) async {
+  Future<_GeminiReview> _reviewWithGemini(String question, String candidate, List<Madda> sources, List<Map<String,String>> history) async {
+    final sourceText = sources.take(8).map((m) => 'القانون: ${m.lawName ?? 'القوانين اليمنية'}\nالمادة: ${m.number}\nالنص: ${m.body}').join('\n\n');
+    final prompt = '''راجع الإجابة القانونية التالية مقابل سؤال المستخدم مراجعة صارمة.
+السؤال الأصلي: $question
+
+الإجابة المرشحة:
+$candidate
+
+المصادر المحلية:
+$sourceText
+
+أعد JSON فقط بهذا الشكل:
+{"match":true,"reason":"...","search_query":"..."}
+
+match=true فقط إذا كانت الإجابة تجيب السؤال نفسه والمصادر مرتبطة بموضوعه مباشرة.
+إذا كانت غير مرتبطة أو عامة أو من قانون خاطئ، اجعل match=false واقترح search_query عربيًا أدق لإعادة البحث.
+لا تعتمد على مجرد تشابه كلمة واحدة مثل شروط أو حالات.
+''';
+    final text = await _callGemini(prompt, history: history, system: 'أنت مراجع قانوني صارم. مهمتك التحقق من تطابق السؤال مع الإجابة والمصادر. لا تخمن. أخرج JSON فقط.');
+    return _parseReview(text);
+  }
+
+  Future<_GeminiReview> _reviewGeneratedAnswerWithGemini(String question, String answer, List<Map<String,String>> history) async {
+    final prompt = '''راجع إجابة Gemini التالية مقابل السؤال.
+السؤال: $question
+الإجابة: $answer
+
+أعد JSON فقط:
+{"match":true,"reason":"...","search_query":"..."}
+
+match=true فقط إذا كانت الإجابة تجيب السؤال مباشرة وبوضوح ولا تدعي نصاً قانونياً يمنياً غير متاح لها.''';
+    final text = await _callGemini(prompt, history: history, system: 'أنت مراجع مستقل لإجابات المساعد القانوني. لا تسمح بإرسال إجابة لا تطابق السؤال. أخرج JSON فقط.');
+    return _parseReview(text);
+  }
+
+  _GeminiReview _parseReview(String text) {
+    var cleaned = text.trim();
+    cleaned = cleaned.replaceAll(RegExp(r'^```(?:json)?\s*'), '').replaceAll(RegExp(r'\s*```$'), '').trim();
+    try {
+      final decoded = jsonDecode(cleaned);
+      if (decoded is Map) {
+        final match = decoded['match'] == true;
+        return _GeminiReview(match, decoded['reason']?.toString() ?? '', decoded['search_query']?.toString() ?? '');
+      }
+    } catch (_) {}
+    return const _GeminiReview(false, 'تعذر التحقق من الإجابة بصيغة موثوقة.', '');
+  }
+
+  Future<String> _callGemini(String prompt, {List<Map<String,String>> history = const [], required String system}) async {
     final model = AppConfig.geminiModel.trim().isEmpty ? 'gemini-3.5-flash-lite' : AppConfig.geminiModel.trim();
     final uri = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent');
     final contents = <Map<String,dynamic>>[];
-    for (final item in history.take(8)) {
+    for (final item in history.take(6)) {
       final text = item['content']?.trim() ?? '';
       if (text.isEmpty) continue;
       contents.add({'role': item['role'] == 'assistant' ? 'model' : 'user', 'parts': [{'text': _stripMarkdown(text)}]});
     }
-    contents.add({'role': 'user', 'parts': [{'text': 'أنت مساعد قانوني داخل موسوعة القانون اليمني. تم البحث أولاً في قاعدة القوانين المحلية ولم توجد مادة مباشرة، ولذلك أنت مسار احتياطي فقط. السؤال: $q\nأجب بالعربية بوضوح. لا تنسب نصاً إلى قانون يمني محدد ما لم يكن النص متاحاً لك. إذا كان السؤال يحتاج نصاً يمنياً محدداً فاذكر أن قاعدة التطبيق لم تجد مادة مباشرة. لا تستخدم Markdown مثل # أو ** أو `.'}]});
+    contents.add({'role': 'user', 'parts': [{'text': prompt}]});
     http.Response response;
     try {
-      response = await http.post(uri, headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'x-goog-api-key': AppConfig.geminiApiKey.trim()}, body: jsonEncode({'systemInstruction': {'parts': [{'text': 'أنت مساعد قانوني عربي. كن دقيقاً ولا تختلق نصوصاً قانونية ولا تستخدم Markdown.'}]}, 'contents': contents}));
+      response = await http.post(uri, headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'x-goog-api-key': AppConfig.geminiApiKey.trim()}, body: jsonEncode({'systemInstruction': {'parts': [{'text': system}]}, 'contents': contents, 'generationConfig': {'temperature': 0.0}}));
     } catch (_) {
-      throw const LegalAiException('تعذر الاتصال بالمساعد الذكي. تحقق من اتصال الإنترنت أو مفتاح Gemini.');
+      throw const LegalAiException('تعذر الاتصال بـ Gemini لمراجعة الإجابة. لم يتم إرسال أي إجابة للمستخدم.');
     }
     Map<String,dynamic> body = {};
     try { final d = jsonDecode(response.body); if (d is Map<String,dynamic>) body = d; } catch (_) {}
-    if (response.statusCode != 200) throw LegalAiException(_apiError(body) ?? 'تعذر الحصول على إجابة من Gemini حالياً.');
+    if (response.statusCode != 200) throw LegalAiException(_apiError(body) ?? 'تعذر استخدام Gemini لمراجعة الإجابة. لم يتم إرسالها.');
     final answer = _generatedText(body);
-    if (answer.isEmpty) throw const LegalAiException('تعذر توليد إجابة من المساعد الذكي.');
-    return _stripMarkdown(answer);
+    if (answer.isEmpty) throw const LegalAiException('لم تصل مراجعة صالحة من Gemini، لذلك لم يتم إرسال الإجابة.');
+    return answer.trim();
+  }
+
+  Future<String> _askGeminiFallback(String q, List<Map<String,String>> history) async {
+    return _callGemini('''أنت مساعد قانوني داخل موسوعة القانون اليمني. لم نجد مادة محلية مباشرة بعد البحث وإعادة البحث. أجب عن السؤال بالعربية بوضوح.
+السؤال: $q
+لا تنسب نصاً إلى قانون يمني محدد ما لم يكن النص متاحاً لك. إذا لم تستطع الإجابة بثقة، صرّح بذلك. لا تستخدم Markdown.''', history: history, system: 'أنت مساعد قانوني عربي. كن دقيقاً ولا تختلق نصوصاً قانونية ولا تستخدم Markdown.');
   }
 
   String _generatedText(Map<String,dynamic> body) {
@@ -250,5 +328,12 @@ class _LegalScope {
   const _LegalScope(this.lawId, this.matchedTerms, this.coreTerms);
 }
 
+class _GeminiReview {
+  final bool isMatch;
+  final String reason;
+  final String searchQuery;
+  const _GeminiReview(this.isMatch, this.reason, this.searchQuery);
+}
+
 const Set<String> _stopWords = {'ما','ماذا','هل','هو','هي','هذا','هذه','ذلك','تلك','من','في','فيه','عن','على','الى','إلى','مع','لي','لدي','اريد','أريد','يمكن','كيف','متى','أين','اين','ماهي','وما'};
-const Set<String> _genericTerms = {'شروط','شرط','حالات','حاله','حالة','جميع','ماهي','ماهى','ماهي','هي','هو','ما','هل','كيف','متى','من','في','عن','على','الى','إلى','ما','وما'};
+const Set<String> _genericTerms = {'شروط','شرط','حالات','حاله','حالة','جميع','ماهي','ماهى','هي','هو','ما','هل','كيف','متى','من','في','عن','على','الى','إلى','وما'};
