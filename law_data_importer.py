@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """
 استخراج نصوص القوانين من ملفات Word وإدراجها في قاعدة البيانات SQLite
+متوافق بالكامل مع واجهة التطبيق
 Extract laws from Word documents and import into SQLite database
+Compatible with app UI (LawDetailScreen, ArticleListScreen, etc.)
 """
 
 import sqlite3
@@ -12,7 +14,7 @@ from docx import Document
 from typing import List, Dict, Optional, Tuple
 
 class LawImporter:
-    """استيراد القوانين من ملفات Word إلى قاعدة البيانات"""
+    """استيراد القوانين من ملفات Word إلى قاعدة البيانات بشكل متوافق مع الواجهة"""
     
     def __init__(self, db_path: str):
         self.db_path = db_path
@@ -26,11 +28,11 @@ class LawImporter:
         print(f"✓ متصل بـ: {self.db_path}")
     
     def close(self):
-        """إغلاق الاتصال"""
+        """إغلاق الاتصال وحفظ التغييرات"""
         if self.connection:
             self.connection.commit()
             self.connection.close()
-            print("✓ قاعدة البيانات مُغلقة")
+            print("✓ تم حفظ قاعدة البيانات")
     
     def get_next_law_order(self) -> int:
         """الحصول على أعلى رقم order_num للقوانين + 1"""
@@ -38,18 +40,32 @@ class LawImporter:
         max_order = self.cursor.fetchone()[0]
         return (max_order or 0) + 1
     
+    def count_articles(self, law_id: int) -> int:
+        """عد المواد القانونية للقانون"""
+        self.cursor.execute("SELECT COUNT(*) FROM mawad WHERE law_id = ?", (law_id,))
+        return self.cursor.fetchone()[0]
+    
     def insert_law(self, name: str, category: str = "أخرى") -> int:
-        """إدراج قانون جديد وإرجاع ID"""
+        """إدراج قانون جديد وإرجاع ID (متوافق مع جدول laws)"""
         order = self.get_next_law_order()
         self.cursor.execute(
-            "INSERT INTO laws (name, category, order_num) VALUES (?, ?, ?)",
+            """INSERT INTO laws (name, category, order_num, articles_count) 
+               VALUES (?, ?, ?, 0)""",
             (name, category, order)
         )
         return self.cursor.lastrowid
     
+    def update_law_articles_count(self, law_id: int):
+        """تحديث عدد المواد في القانون"""
+        count = self.count_articles(law_id)
+        self.cursor.execute(
+            "UPDATE laws SET articles_count = ? WHERE id = ?",
+            (count, law_id)
+        )
+    
     def insert_bab(self, law_id: int, label: str, level: str, 
                    order_num: int, parent_bab_id: Optional[int] = None) -> int:
-        """إدراج باب (كتاب/قسم/باب) وإرجاع ID"""
+        """إدراج باب/كتاب/قسم (متوافق مع جدول abwab)"""
         self.cursor.execute(
             """INSERT INTO abwab (law_id, parent_bab_id, label, level, order_num) 
                VALUES (?, ?, ?, ?, ?)""",
@@ -59,7 +75,7 @@ class LawImporter:
     
     def insert_fasl(self, law_id: int, bab_id: Optional[int], 
                    label: str, order_num: int) -> int:
-        """إدراج فصل وإرجاع ID"""
+        """إدراج فصل (متوافق مع جدول fusul)"""
         self.cursor.execute(
             """INSERT INTO fusul (law_id, bab_id, label, order_num) 
                VALUES (?, ?, ?, ?)""",
@@ -71,7 +87,7 @@ class LawImporter:
                     bab_id: Optional[int] = None, 
                     fasl_id: Optional[int] = None,
                     order_num: int = 0) -> int:
-        """إدراج مادة وإرجاع ID"""
+        """إدراج مادة قانونية (متوافق مع جدول mawad)"""
         self.cursor.execute(
             """INSERT INTO mawad (law_id, number, body, bab_id, fasl_id, order_num) 
                VALUES (?, ?, ?, ?, ?, ?)""",
@@ -84,151 +100,276 @@ class LawImporter:
         try:
             doc = Document(file_path)
             paragraphs = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
-            print(f"✓ تم استخراج {len(paragraphs)} فقرة من {file_path}")
+            print(f"  ✓ تم استخراج {len(paragraphs)} فقرة")
             return paragraphs
         except Exception as e:
-            print(f"✗ خطأ في قراءة {file_path}: {e}")
+            print(f"  ✗ خطأ في قراءة الملف: {e}")
             return []
+    
+    def is_bab_header(self, text: str) -> Optional[Tuple[str, str, str]]:
+        """
+        التحقق من أن النص عنوان باب/كتاب/قسم
+        يرجع: (النوع، الرقم/الاسم، العنوان الكامل) أو None
+        
+        الأنماط المدعومة:
+        - الباب الأول: ...
+        - الكتاب الثاني: ...
+        - القسم الثالث: ...
+        """
+        patterns = [
+            (r'^(الباب|الكتاب|القسم)\s+(\w+)\s*:\s*(.*)', 'باب'),
+            (r'^(BOOK|CHAPTER|SECTION)\s+(\d+)\s*:\s*(.*)', 'باب'),
+        ]
+        
+        for pattern, level in patterns:
+            match = re.match(pattern, text, re.IGNORECASE)
+            if match:
+                return (level, match.group(2), match.group(3) or match.group(2))
+        return None
+    
+    def is_fasl_header(self, text: str) -> Optional[Tuple[str, str]]:
+        """
+        التحقق من أن النص عنوان فصل
+        يرجع: (الرقم/الاسم، العنوان الكامل) أو None
+        """
+        patterns = [
+            r'^الفصل\s+(\w+)\s*:\s*(.*)',
+            r'^CHAPTER\s+(\d+)\s*:\s*(.*)',
+        ]
+        
+        for pattern in patterns:
+            match = re.match(pattern, text, re.IGNORECASE)
+            if match:
+                return (match.group(1), match.group(2) or match.group(1))
+        return None
+    
+    def is_madda_header(self, text: str) -> Optional[Tuple[str, str]]:
+        """
+        التحقق من أن النص عنوان مادة
+        يرجع: (رقم المادة، نص المادة) أو None
+        
+        الأنماط المدعومة:
+        - المادة 1: ...
+        - المادة رقم 1: ...
+        - Article 1: ...
+        """
+        patterns = [
+            r'^المادة\s+(?:رقم\s+)?(\d+)\s*:\s*(.*)',
+            r'^Article\s+(\d+)\s*:\s*(.*)',
+        ]
+        
+        for pattern in patterns:
+            match = re.match(pattern, text, re.IGNORECASE)
+            if match:
+                return (match.group(1), match.group(2) or "")
+        return None
     
     def parse_law_structure(self, paragraphs: List[str]) -> Dict:
         """
         تحليل بنية القانون من الفقرات
-        الهيكل المتوقع:
-        - عناوين الأبواب: "الباب الأول:" أو "الكتاب الثاني:"
-        - عناوين الفصول: "الفصل الأول:" أو "الفصل الثاني:"
-        - المواد: "المادة 1:" أو "المادة رقم 1:"
+        
+        يدعم الهياكل التالية:
+        1. باب > فصول > مواد
+        2. باب > مواد
+        3. فصول > مواد (بدون أبواب)
+        4. مواد مباشرة (بدون أبواب أو فصول)
+        
+        يرجع قاموس يحتوي على البنية الهرمية
         """
         structure = {
-            'abwab': [],
-            'fusul': [],
-            'mawad': []
+            'abwab': [],      # قائمة الأبواب
+            'fusul': [],      # قائمة الفصول
+            'mawad': []       # قائمة المواد
         }
         
         current_bab = None
         current_fasl = None
-        madda_order = 0
+        madda_count = 0
+        fasl_count = 0
+        bab_count = 0
         
         for i, paragraph in enumerate(paragraphs):
-            # البحث عن عنوان باب
-            bab_match = re.match(r'^(الكتاب|الباب|القسم)\s+(\w+)\s*:\s*(.*)', paragraph)
-            if bab_match:
+            # فحص عنوان الباب
+            bab_result = self.is_bab_header(paragraph)
+            if bab_result:
+                level_type, number, title = bab_result
+                bab_count += 1
                 current_bab = {
-                    'level': bab_match.group(1),
-                    'name': bab_match.group(2),
-                    'title': bab_match.group(3) or "",
-                    'order': len(structure['abwab'])
+                    'level': level_type,
+                    'number': number,
+                    'title': title,
+                    'order': bab_count,
+                    'fusul': []
                 }
                 structure['abwab'].append(current_bab)
                 current_fasl = None
-                madda_order = 0
+                madda_count = 0
+                print(f"    ✓ {level_type}: {title}")
                 continue
             
-            # البحث عن عنوان فصل
-            fasl_match = re.match(r'^الفصل\s+(\w+)\s*:\s*(.*)', paragraph)
-            if fasl_match:
+            # فحص عنوان الفصل
+            fasl_result = self.is_fasl_header(paragraph)
+            if fasl_result:
+                number, title = fasl_result
+                fasl_count += 1
                 current_fasl = {
-                    'name': fasl_match.group(1),
-                    'title': fasl_match.group(2) or "",
+                    'number': number,
+                    'title': title,
+                    'order': fasl_count,
                     'parent_bab': current_bab,
-                    'order': len(structure['fusul'])
+                    'mawad': []
                 }
                 structure['fusul'].append(current_fasl)
-                madda_order = 0
+                madda_count = 0
+                print(f"      ✓ فصل: {title}")
                 continue
             
-            # البحث عن مادة
-            madda_match = re.match(r'^المادة\s+(?:رقم\s+)?(\d+)\s*:\s*(.*)', paragraph)
-            if madda_match:
-                madda_order += 1
+            # فحص عنوان المادة
+            madda_result = self.is_madda_header(paragraph)
+            if madda_result:
+                number, body = madda_result
+                madda_count += 1
                 madda = {
-                    'number': madda_match.group(1),
-                    'body': madda_match.group(2),
+                    'number': number,
+                    'body': body[:500] if len(body) > 500 else body,  # حد أقصى 500 حرف للعرض
+                    'full_body': body,  # النص الكامل
                     'parent_fasl': current_fasl,
                     'parent_bab': current_bab,
-                    'order': madda_order
+                    'order': madda_count
                 }
                 structure['mawad'].append(madda)
+                continue
+            
+            # إذا لم يكن عنوانًا ولم نكن في مادة، قد يكون محتوى مادة سابقة
+            if structure['mawad'] and not self.is_madda_header(paragraph):
+                # إضافة إلى نص آخر مادة
+                structure['mawad'][-1]['full_body'] += "\n" + paragraph
+                structure['mawad'][-1]['body'] = structure['mawad'][-1]['full_body'][:500]
         
         return structure
     
     def import_from_word(self, file_path: str, law_name: str, category: str = "أخرى"):
-        """استيراد قانون كامل من ملف Word"""
-        print(f"\n📄 جاري معالجة: {law_name}")
+        """
+        استيراد قانون كامل من ملف Word
+        يضمن التوافق الكامل مع واجهة التطبيق
+        """
+        print(f"\n{'='*60}")
+        print(f"📄 جاري استيراد: {law_name}")
+        print(f"{'='*60}")
+        
+        # التحقق من وجود الملف
+        if not os.path.exists(file_path):
+            print(f"✗ لم يتم العثور على الملف: {file_path}")
+            return False
         
         # استخراج الفقرات
+        print(f"⏳ استخراج المحتوى...")
         paragraphs = self.extract_docx_paragraphs(file_path)
         if not paragraphs:
-            print(f"✗ لم يتم استخراج محتوى من {file_path}")
-            return
+            print(f"✗ لم يتم استخراج محتوى من الملف")
+            return False
         
         # تحليل البنية
+        print(f"⏳ تحليل البنية...")
         structure = self.parse_law_structure(paragraphs)
         
         # إدراج القانون
+        print(f"⏳ إدراج البيانات في قاعدة البيانات...")
         law_id = self.insert_law(law_name, category)
-        print(f"✓ تم إدراج القانون: {law_name} (ID: {law_id})")
+        print(f"✓ تم إدراج القانون: {law_name}")
+        print(f"  ID: {law_id} | الفئة: {category}")
         
-        # إدراج الأبواب والفصول والمواد
-        for bab in structure['abwab']:
-            bab_id = self.insert_bab(law_id, bab['title'], bab['level'], bab['order'])
-            print(f"  ✓ {bab['level']}: {bab['title']}")
-            
-            # المواد المباشرة تحت الباب
-            for madda in structure['mawad']:
-                if madda['parent_bab'] == bab and not madda['parent_fasl']:
-                    self.insert_madda(
-                        law_id, madda['number'], madda['body'],
-                        bab_id=bab_id, order_num=madda['order']
-                    )
-            
-            # الفصول تحت الباب
+        # قاموس لتخزين IDs الأبواب والفصول لسهولة الربط
+        bab_ids = {}  # key: bab object id, value: db id
+        fasl_ids = {} # key: fasl object id, value: db id
+        
+        # إدراج الأبواب
+        if structure['abwab']:
+            print(f"\n📚 الأبواب ({len(structure['abwab'])}):")
+            for bab in structure['abwab']:
+                bab_id = self.insert_bab(
+                    law_id, 
+                    bab['title'], 
+                    bab['level'], 
+                    bab['order']
+                )
+                bab_ids[id(bab)] = bab_id
+        
+        # إدراج الفصول
+        if structure['fusul']:
+            print(f"\n📖 الفصول ({len(structure['fusul'])}):")
             for fasl in structure['fusul']:
-                if fasl['parent_bab'] == bab:
-                    fasl_id = self.insert_fasl(law_id, bab_id, fasl['title'], fasl['order'])
-                    print(f"    ✓ فصل: {fasl['title']}")
-                    
-                    # المواد تحت الفصل
-                    for madda in structure['mawad']:
-                        if madda['parent_fasl'] == fasl:
-                            self.insert_madda(
-                                law_id, madda['number'], madda['body'],
-                                bab_id=bab_id, fasl_id=fasl_id, 
-                                order_num=madda['order']
-                            )
-        
-        # الفصول والمواد الجذرية (بدون باب أب)
-        for fasl in structure['fusul']:
-            if not fasl['parent_bab']:
-                fasl_id = self.insert_fasl(law_id, None, fasl['title'], fasl['order'])
-                print(f"  ✓ فصل (جذري): {fasl['title']}")
+                parent_bab_id = None
+                if fasl['parent_bab']:
+                    parent_bab_id = bab_ids.get(id(fasl['parent_bab']))
                 
-                for madda in structure['mawad']:
-                    if madda['parent_fasl'] == fasl:
-                        self.insert_madda(
-                            law_id, madda['number'], madda['body'],
-                            fasl_id=fasl_id, order_num=madda['order']
-                        )
+                fasl_id = self.insert_fasl(
+                    law_id,
+                    parent_bab_id,
+                    fasl['title'],
+                    fasl['order']
+                )
+                fasl_ids[id(fasl)] = fasl_id
         
-        # المواد الجذرية (بدون باب ولا فصل)
-        for madda in structure['mawad']:
-            if not madda['parent_bab'] and not madda['parent_fasl']:
+        # إدراج المواد
+        if structure['mawad']:
+            print(f"\n📄 المواد ({len(structure['mawad'])}):")
+            for i, madda in enumerate(structure['mawad'], 1):
+                parent_bab_id = None
+                parent_fasl_id = None
+                
+                if madda['parent_bab']:
+                    parent_bab_id = bab_ids.get(id(madda['parent_bab']))
+                
+                if madda['parent_fasl']:
+                    parent_fasl_id = fasl_ids.get(id(madda['parent_fasl']))
+                
                 self.insert_madda(
-                    law_id, madda['number'], madda['body'],
+                    law_id,
+                    madda['number'],
+                    madda['full_body'],
+                    bab_id=parent_bab_id,
+                    fasl_id=parent_fasl_id,
                     order_num=madda['order']
                 )
+                
+                if i % 10 == 0 or i == 1:
+                    print(f"  ✓ تم إدراج {i}/{len(structure['mawad'])} مادة")
+            
+            print(f"  ✓ اكتمل إدراج {len(structure['mawad'])} مادة")
         
-        print(f"✓ تم إدراج {len(structure['mawad'])} مادة")
+        # تحديث عدد المواد في جدول laws
+        self.update_law_articles_count(law_id)
+        
+        # الإحصائيات النهائية
+        print(f"\n{'='*60}")
+        print(f"✓ اكتمل الاستيراد بنجاح!")
+        print(f"{'='*60}")
+        print(f"📊 الإحصائيات:")
+        print(f"  • القانون: {law_name}")
+        print(f"  • الأبواب: {len(structure['abwab'])}")
+        print(f"  • الفصول: {len(structure['fusul'])}")
+        print(f"  • المواد: {len(structure['mawad'])}")
+        print(f"{'='*60}\n")
+        
+        return True
 
 
 def main():
     """البرنامج الرئيسي"""
-    db_path = "app_database.db"
+    
+    # مسار قاعدة البيانات
+    db_path = "assets/db/app_database.db"
+    
+    # التحقق من وجود المسار
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
     
     importer = LawImporter(db_path)
     importer.connect()
     
-    # قائمة الملفات المراد استيرادها
-    word_files = [
+    # قائمة الملفات والقوانين المراد استيرادها
+    # (اسم الملف، اسم القانون، الفئة/التصنيف)
+    laws_to_import = [
         ("قانون اراضي وعقارات الدولة.docx", "قانون أراضي وعقارات الدولة", "القانون الإداري"),
         ("قانون التحكيم.docx", "قانون التحكيم", "القانون الإجرائي"),
         ("قانون الجرائم والعقوبات العسكرية.docx", "قانون الجرائم والعقوبات العسكرية", "القانون الجنائي"),
@@ -239,14 +380,33 @@ def main():
         ("قانون مزاولة المهن الطبية.docx", "قانون مزاولة المهن الطبية", "القانون الطبي"),
     ]
     
-    for file_name, law_name, category in word_files:
-        if os.path.exists(file_name):
-            importer.import_from_word(file_name, law_name, category)
+    print("\n")
+    print("╔════════════════════════════════════════════════════════════╗")
+    print("║      استيراد القوانين اليمنية إلى التطبيق                 ║")
+    print("║   Law Importer - Compatible with Flutter App UI           ║")
+    print("╚════════════════════════════════════════════════════════════╝")
+    
+    success_count = 0
+    failed_count = 0
+    
+    for file_name, law_name, category in laws_to_import:
+        if importer.import_from_word(file_name, law_name, category):
+            success_count += 1
         else:
-            print(f"⚠ لم يتم العثور على: {file_name}")
+            failed_count += 1
     
     importer.close()
-    print("\n✓ اكتمل الاستيراد!")
+    
+    # النتيجة النهائية
+    print("\n")
+    print("╔════════════════════════════════════════════════════════════╗")
+    print("║                    النتيجة النهائية                       ║")
+    print("╚════════════════════════════════════════════════════════════╝")
+    print(f"✓ تم استيراد: {success_count} قانون بنجاح")
+    if failed_count > 0:
+        print(f"✗ فشل: {failed_count} قانون")
+    print("\n✓ جاهزة قاعدة البيانات للاستخدام في التطبيق!")
+    print("✓ Database ready for Flutter app!\n")
 
 
 if __name__ == "__main__":
