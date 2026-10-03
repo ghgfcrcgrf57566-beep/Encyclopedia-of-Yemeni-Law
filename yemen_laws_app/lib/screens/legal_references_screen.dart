@@ -11,6 +11,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 const kLegalReferencesIndexUrl = 'https://raw.githubusercontent.com/ghgfcrcgrf57566-beep/Encyclopedia-of-Yemeni-Law/main/legal_references.json';
 const kLegalReferencesAdditionalIndexUrl = 'https://raw.githubusercontent.com/ghgfcrcgrf57566-beep/Encyclopedia-of-Yemeni-Law/main/legal_references_additional.json';
 const kLegalReferencesReligiousIndexUrl = 'https://raw.githubusercontent.com/ghgfcrcgrf57566-beep/Encyclopedia-of-Yemeni-Law/main/legal_references_religious.json';
+const kLegalReferencesExpandedIndexUrl = 'https://raw.githubusercontent.com/ghgfcrcgrf57566-beep/Encyclopedia-of-Yemeni-Law/main/legal_references_expanded.json';
+const kLegalReferencesExpanded2IndexUrl = 'https://raw.githubusercontent.com/ghgfcrcgrf57566-beep/Encyclopedia-of-Yemeni-Law/main/legal_references_expanded_2.json';
 
 const _sections = <String>[
   'مراجع قانونية',
@@ -27,7 +29,7 @@ class LegalReferencesScreen extends StatefulWidget {
 }
 
 class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
-  static const _cacheKey = 'cached_legal_references_json_v7';
+  static const _cacheKey = 'cached_legal_references_json_v8';
   final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 15),
     receiveTimeout: const Duration(seconds: 90),
@@ -35,13 +37,11 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
   ));
   final _search = TextEditingController();
   List<Map<String, dynamic>> _items = [];
-  List<Map<String, dynamic>> _filtered = [];
-  final Set<String> _downloaded = {};
+  Set<String> _downloaded = {};
   final Map<String, double> _progress = {};
   bool _loading = true;
   String _query = '';
-  String _source = '';
-  String _section = _sections[0];
+  String _section = _sections.first;
 
   @override
   void initState() {
@@ -66,17 +66,17 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
     }
   }
 
-  bool _isValidReference(Map<String, dynamic> item) {
+  bool _valid(Map<String, dynamic> item) {
     final pdf = '${item['pdf_url'] ?? ''}'.trim();
     return pdf.isNotEmpty && Uri.tryParse(pdf)?.hasScheme == true;
   }
 
-  List<Map<String, dynamic>> _mergeUnique(List<List<Map<String, dynamic>>> groups) {
+  List<Map<String, dynamic>> _merge(List<List<Map<String, dynamic>>> groups) {
     final result = <Map<String, dynamic>>[];
     final seen = <String>{};
     for (final group in groups) {
       for (final item in group) {
-        if (!_isValidReference(item)) continue;
+        if (!_valid(item)) continue;
         final id = '${item['id'] ?? ''}'.trim();
         if (id.isNotEmpty && seen.add(id)) result.add(item);
       }
@@ -86,100 +86,67 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
 
   String _sectionOf(Map<String, dynamic> item) {
     final id = '${item['id'] ?? ''}'.toLowerCase();
-    final title = '${item['title'] ?? ''}';
-    final category = '${item['category'] ?? ''}';
-    final description = '${item['description'] ?? ''}';
-    final text = '$id $title $category $description'.toLowerCase();
+    final text = [item['title'], item['author'], item['category'], item['description'], item['full_summary'], id]
+        .join(' ')
+        .toLowerCase();
 
-    // الدراسات المقارنة والأبحاث: لا نترك هذا القسم فارغًا إذا وجدت مادة مناسبة.
-    final comparativeOrResearchIds = <String>{
-      'al_tashri_al_jinai_al_islami',
-      'tarikh_al_tashri_al_islami',
-      'muhadarat_qanun_madani_iraqi_1955',
-    };
-    if (comparativeOrResearchIds.contains(id) ||
-        text.contains('مقارن') ||
-        text.contains('مقارنة') ||
-        text.contains('دراسة مقارنة') ||
-        text.contains('دراسات مقارنة') ||
-        text.contains('أبحاث') ||
-        text.contains('بحث مقارن')) {
+    if (text.contains('مقارن') || text.contains('مقارنة') || text.contains('دراسة مقارنة') ||
+        text.contains('دراسات مقارنة') || text.contains('أبحاث') || text.contains('بحث مقارن') ||
+        id.contains('comparative') || id.contains('philosophy_legislation')) {
       return 'دراسات مقارنة ودراسات وأبحاث';
     }
 
-    // الشروح والحواشي والموسوعات والمجاميع التي تقوم أساسًا على الشرح والتفسير.
-    if (text.contains('شرح') ||
-        text.contains('شروح') ||
-        text.contains('موسوعة') ||
-        text.contains('موسوعات') ||
-        text.contains('حاشية') ||
-        text.contains('المجموع شرح') ||
-        text.contains('مرآة العقول') ||
-        text.contains('شرح نهج البلاغة') ||
-        text.contains('كشف الأسرار')) {
+    if (text.contains('شرح') || text.contains('شروح') || text.contains('موسوعة') ||
+        text.contains('موسوعات') || text.contains('حاشية') || text.contains('مجموع شرح') ||
+        text.contains('مرآة العقول') || text.contains('كشف الأسرار')) {
       return 'شروح وموسوعات';
     }
 
-    // المراجع الشرعية الأصلية والفقهية.
-    const religiousWords = <String>[
-      'فقه', 'شرعي', 'الشريعة', 'إسلام', 'الإسلام', 'المذاهب', 'مذهب',
-      'أوقاف', 'وقف', 'حديث', 'أصول الفقه', 'قواعد فقهية', 'فتاوى',
-      'الفرائض', 'الحلال والحرام', 'التشريع الإسلامي', 'الشيعة',
-      'السنة', 'السنّة', 'جعفر الصادق', 'الفقه الإمامي', 'الإمامية',
+    const religious = <String>[
+      'فقه', 'شرعي', 'الشريعة', 'إسلام', 'الإسلام', 'المذاهب', 'مذهب', 'أوقاف', 'وقف',
+      'حديث', 'أصول الفقه', 'قواعد فقهية', 'فتاوى', 'الفرائض', 'المواريث', 'الحلال والحرام',
+      'التشريع الإسلامي', 'الشيعة', 'السنة', 'السنّة', 'جعفر الصادق', 'الفقه الإمامي', 'الإمامية',
     ];
-    if (religiousWords.any(text.contains)) return 'مراجع شرعية';
-
+    if (religious.any(text.contains)) return 'مراجع شرعية';
     return 'مراجع قانونية';
   }
 
-  String _cleanBookSummary(String original) {
-    var cleaned = original.trim();
-    if (cleaned.isEmpty) return cleaned;
-    final patterns = <RegExp>[
-      RegExp(r'،?\s*ومتاح للقراءة والتنزيل من مجموعة Arabic Collections Online.*', caseSensitive: false),
-      RegExp(r'،?\s*ومتاح حاليًا للقراءة والتنزيل من Arabic Collections Online.*', caseSensitive: false),
-      RegExp(r'،?\s*ومتاحة حاليًا للقراءة والتنزيل من Arabic Collections Online.*', caseSensitive: false),
-      RegExp(r'،?\s*متاح(?:ة)? مجانًا.*Arabic Collections Online.*', caseSensitive: false),
-      RegExp(r'،?\s*متاح(?:ة)? حاليًا.*(?:التنزيل|القراءة).*', caseSensitive: false),
-      RegExp(r'،?\s*من مجموعة Arabic Collections Online.*', caseSensitive: false),
-      RegExp(r'،?\s*متاح(?:ة)? من مكتبات عربية رقمية جامعية.*', caseSensitive: false),
-      RegExp(r'\s*NYU\s*/?.*', caseSensitive: false),
-      RegExp(r'\s*Arabic Collections Online.*', caseSensitive: false),
-    ];
-    for (final pattern in patterns) {
-      cleaned = cleaned.replaceAll(pattern, '');
+  List<Map<String, dynamic>> get _visible => _items.where((item) {
+    if (_sectionOf(item) != _section) return false;
+    final q = _query.trim().toLowerCase();
+    if (q.isEmpty) return true;
+    return [item['title'], item['author'], item['category'], item['description'], item['full_summary']]
+        .join(' ')
+        .toLowerCase()
+        .contains(q);
+  }).toList();
+
+  Future<void> _loadIndex() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cached = prefs.getString(_cacheKey);
+    if (cached != null) {
+      final value = _merge([_parse(cached)]);
+      if (value.isNotEmpty && mounted) setState(() => _items = value);
     }
-    return cleaned
-        .replaceAll(RegExp(r'\s{2,}'), ' ')
-        .replaceAll(RegExp(r'\s+([،.!؟])'), r'$1')
-        .trim();
-  }
 
-  void _apply(List<Map<String, dynamic>> value) {
-    if (!mounted) return;
-    setState(() {
-      _items = value;
-      _filtered = _filter(_query);
-    });
-  }
+    try {
+      final responses = await Future.wait([
+        _dio.get<String>(kLegalReferencesIndexUrl),
+        _dio.get<String>(kLegalReferencesAdditionalIndexUrl),
+        _dio.get<String>(kLegalReferencesReligiousIndexUrl),
+        _dio.get<String>(kLegalReferencesExpandedIndexUrl),
+        _dio.get<String>(kLegalReferencesExpanded2IndexUrl),
+      ]);
+      final groups = responses.map((r) => r.statusCode == 200 && r.data != null ? _parse(r.data!) : <Map<String, dynamic>>[]).toList();
+      final merged = _merge(groups);
+      if (merged.isNotEmpty) {
+        await prefs.setString(_cacheKey, jsonEncode(merged));
+        if (mounted) setState(() => _items = merged);
+      }
+    } catch (_) {}
 
-  List<Map<String, dynamic>> _filter(String query) {
-    final q = query.trim().toLowerCase();
-    return _items.where((item) {
-      if (_sectionOf(item) != _section) return false;
-      if (q.isEmpty) return true;
-      return [
-        item['id'], item['title'], item['author'], item['category'],
-        item['description'], item['full_summary'],
-      ].join(' ').toLowerCase().contains(q);
-    }).toList();
-  }
-
-  void _selectSection(String value) {
-    setState(() {
-      _section = value;
-      _filtered = _filter(_query);
-    });
+    await _refreshDownloaded();
+    if (mounted) setState(() => _loading = false);
   }
 
   String _fileName(Map<String, dynamic> item) =>
@@ -192,45 +159,12 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
     return File('${dir.path}/${_fileName(item)}');
   }
 
-  Future<void> _loadIndex() async {
-    final prefs = await SharedPreferences.getInstance();
-    final cached = prefs.getString(_cacheKey);
-    if (cached != null) {
-      final value = _mergeUnique([_parse(cached)]);
-      if (value.isNotEmpty) {
-        _apply(value);
-        _source = 'نسخة محفوظة محليًا';
-      }
-    }
-    try {
-      final responses = await Future.wait([
-        _dio.get<String>(kLegalReferencesIndexUrl),
-        _dio.get<String>(kLegalReferencesAdditionalIndexUrl),
-        _dio.get<String>(kLegalReferencesReligiousIndexUrl),
-      ]);
-      final groups = responses
-          .map((response) => response.statusCode == 200 && response.data != null
-              ? _parse(response.data!)
-              : <Map<String, dynamic>>[])
-          .toList();
-      final merged = _mergeUnique(groups);
-      if (merged.isNotEmpty) {
-        await prefs.setString(_cacheKey, jsonEncode(merged));
-        _apply(merged);
-        _source = 'محدّث من GitHub';
-      }
-    } catch (_) {}
-    await _refreshDownloaded();
-    if (mounted) setState(() => _loading = false);
-  }
-
   Future<void> _refreshDownloaded() async {
     final found = <String>{};
     for (final item in _items) {
-      final file = await _file(item);
-      if (await file.exists()) found.add(_fileName(item));
+      if (await (await _file(item)).exists()) found.add(_fileName(item));
     }
-    if (mounted) setState(() { _downloaded..clear()..addAll(found); });
+    if (mounted) setState(() => _downloaded = found);
   }
 
   Future<void> _download(Map<String, dynamic> item) async {
@@ -243,17 +177,13 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
     if (url.isEmpty) return _message('لا يوجد ملف PDF مباشر لهذا المرجع.');
     final id = '${item['id']}';
     final temp = File('${file.path}.part');
-    if (mounted) setState(() => _progress[id] = 0);
+    setState(() => _progress[id] = 0);
     try {
-      await _dio.download(
-        url,
-        temp.path,
-        deleteOnError: true,
-        options: Options(followRedirects: true, maxRedirects: 5),
-        onReceiveProgress: (received, total) {
-          if (mounted && total > 0) setState(() => _progress[id] = received / total);
-        },
-      );
+      await _dio.download(url, temp.path, deleteOnError: true,
+          options: Options(followRedirects: true, maxRedirects: 5),
+          onReceiveProgress: (received, total) {
+            if (mounted && total > 0) setState(() => _progress[id] = received / total);
+          });
       if (!await temp.exists()) throw const FileSystemException('download_failed');
       if (await file.exists()) await file.delete();
       await temp.rename(file.path);
@@ -266,126 +196,137 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
     }
   }
 
-  void _showBookSummary(Map<String, dynamic> item) {
+  void _openPdf(String path, String title) {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => Scaffold(
+      backgroundColor: const Color(0xFF120D09),
+      appBar: AppBar(title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis), backgroundColor: const Color(0xFF2A1A10)),
+      body: PDFView(filePath: path),
+    )));
+  }
+
+  void _message(String text) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text), behavior: SnackBarBehavior.floating));
+
+  void _showInfo(Map<String, dynamic> item) {
     final title = '${item['title'] ?? 'المرجع'}';
-    final author = '${item['author'] ?? ''}'.trim();
-    final category = '${item['category'] ?? ''}'.trim();
-    final rawSummary = '${item['full_summary'] ?? item['description'] ?? ''}'.trim();
-    final summary = _cleanBookSummary(rawSummary);
+    final summary = '${item['full_summary'] ?? item['description'] ?? ''}'.trim();
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) => DraggableScrollableSheet(
-        initialChildSize: 0.72,
-        minChildSize: 0.45,
-        maxChildSize: 0.92,
+      backgroundColor: const Color(0xFF21150D),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+      builder: (_) => DraggableScrollableSheet(
         expand: false,
-        builder: (_, controller) => Container(
-          decoration: const BoxDecoration(
-            color: Color(0xFF1E1A16),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
-          ),
-          child: ListView(
-            controller: controller,
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-            children: [
-              Center(child: Container(width: 42, height: 4, margin: const EdgeInsets.only(bottom: 18), decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(4)))),
-              Row(textDirection: TextDirection.rtl, children: [
-                _cover(item, width: 52, height: 64),
-                const SizedBox(width: 12),
-                Expanded(child: Text(title, textAlign: TextAlign.right, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w800, height: 1.35))),
-              ]),
-              const SizedBox(height: 18),
-              if (author.isNotEmpty || category.isNotEmpty)
-                Text([author, category].where((e) => e.isNotEmpty).join(' — '), textAlign: TextAlign.right, style: const TextStyle(color: Color(0xFFD4AF37), fontSize: 14, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 18),
-              const Text('نبذة عن الكتاب', textAlign: TextAlign.right, style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 10),
-              Text(summary.isEmpty ? 'لا توجد نبذة تعريفية متاحة حاليًا.' : summary, textAlign: TextAlign.right, style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.8)),
-              const SizedBox(height: 22),
-              SizedBox(height: 48, child: ElevatedButton.icon(onPressed: () => Navigator.pop(sheetContext), icon: const Icon(Icons.close_rounded), label: const Text('إغلاق'), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37), foregroundColor: Colors.black, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))))),
+        initialChildSize: .62,
+        minChildSize: .35,
+        maxChildSize: .9,
+        builder: (_, controller) => ListView(
+          controller: controller,
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
+          children: [
+            Center(child: Container(width: 42, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(8)))),
+            const SizedBox(height: 20),
+            Text(title, textAlign: TextAlign.right, style: const TextStyle(color: Color(0xFFE5BE72), fontSize: 21, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 14),
+            _infoRow('المؤلف', '${item['author'] ?? 'غير محدد'}'),
+            _infoRow('القسم', _sectionOf(item)),
+            if (summary.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              const Text('نبذة عن الكتاب', textAlign: TextAlign.right, style: TextStyle(color: Color(0xFFE5BE72), fontWeight: FontWeight.w800)),
+              const SizedBox(height: 7),
+              Text(summary, textAlign: TextAlign.right, style: const TextStyle(color: Colors.white70, height: 1.65, fontSize: 14)),
             ],
-          ),
+            const SizedBox(height: 22),
+            FilledButton.icon(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close), label: const Text('إغلاق'), style: FilledButton.styleFrom(backgroundColor: const Color(0xFFD4AF37), foregroundColor: Colors.black)),
+          ],
         ),
       ),
     );
   }
 
-  Widget _cover(Map<String, dynamic> item, {double width = 58, double height = 70}) {
-    const gold = Color(0xFFD4AF37);
+  Widget _infoRow(String label, String value) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 5),
+    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Expanded(child: Text(value, textAlign: TextAlign.right, style: const TextStyle(color: Colors.white70, fontSize: 13))),
+      const SizedBox(width: 10),
+      Text('$label: ', style: const TextStyle(color: Color(0xFFE5BE72), fontWeight: FontWeight.bold)),
+    ]),
+  );
+
+  Widget _cover(Map<String, dynamic> item) {
     final url = '${item['cover_image_url'] ?? ''}'.trim();
-    final valid = url.isNotEmpty && Uri.tryParse(url)?.hasScheme == true;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: width,
-        height: height,
-        color: const Color(0xFF302319),
-        child: valid
-            ? CachedNetworkImage(imageUrl: url, fit: BoxFit.cover, placeholder: (_, __) => const Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: gold))), errorWidget: (_, __, ___) => const Icon(Icons.menu_book_rounded, color: gold, size: 30))
-            : const Icon(Icons.menu_book_rounded, color: gold, size: 30),
-      ),
-    );
-  }
-
-  void _openPdf(String path, String title) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => _ReferencePdfViewer(filePath: path, title: title)));
-
-  void _message(String text) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text, textAlign: TextAlign.right)));
-  }
-
-  Widget _sectionChip(String label) {
-    final selected = label == _section;
-    return ChoiceChip(
-      selected: selected,
-      label: Text(label, style: TextStyle(color: selected ? Colors.black : Colors.white70, fontWeight: FontWeight.w700, fontSize: 12)),
-      selectedColor: const Color(0xFFD4AF37),
-      backgroundColor: const Color(0xFF1A1A1A),
-      side: BorderSide(color: selected ? const Color(0xFFD4AF37) : Colors.white12),
-      onSelected: (_) => _selectSection(label),
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 8),
-    );
+    if (url.isEmpty) return const Icon(Icons.menu_book_rounded, size: 42, color: Color(0xFFD4AF37));
+    return ClipRRect(borderRadius: BorderRadius.circular(10), child: CachedNetworkImage(
+      imageUrl: url, width: 72, height: 96, fit: BoxFit.cover,
+      placeholder: (_, __) => const Center(child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFD4AF37))),
+      errorWidget: (_, __, ___) => const Icon(Icons.menu_book_rounded, size: 42, color: Color(0xFFD4AF37)),
+    ));
   }
 
   @override
   Widget build(BuildContext context) {
-    const gold = Color(0xFFD4AF37);
-    const surface = Color(0xFF1A1A1A);
-    final sectionCount = _items.where((e) => _sectionOf(e) == _section).length;
+    final visible = _visible;
     return Scaffold(
-      backgroundColor: const Color(0xFF121212),
-      appBar: AppBar(backgroundColor: surface, title: const Text('المراجع القانونية', style: TextStyle(color: Color(0xFFF0D78A), fontWeight: FontWeight.w800)), centerTitle: true, iconTheme: const IconThemeData(color: gold)),
+      backgroundColor: const Color(0xFF120D09),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF21150D),
+        centerTitle: true,
+        title: const Text('المراجع القانونية', style: TextStyle(color: Color(0xFFE5BE72), fontWeight: FontWeight.bold)),
+      ),
       body: Column(children: [
-        Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 8), child: TextField(controller: _search, onChanged: (value) => setState(() { _query = value; _filtered = _filter(value); }), textAlign: TextAlign.right, style: const TextStyle(color: Colors.white), decoration: InputDecoration(hintText: 'ابحث باسم الكتاب أو المؤلف...', hintStyle: const TextStyle(color: Colors.white38), prefixIcon: const Icon(Icons.search_rounded, color: gold), filled: true, fillColor: surface, border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(16)), borderSide: BorderSide.none)))),
-        SizedBox(height: 54, child: ListView.separated(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6), scrollDirection: Axis.horizontal, itemCount: _sections.length, separatorBuilder: (_, __) => const SizedBox(width: 8), itemBuilder: (_, i) => _sectionChip(_sections[i]))),
-        Padding(padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 3), child: Row(children: [Expanded(child: Text('${_filtered.length} من أصل $sectionCount مرجع', style: const TextStyle(color: Colors.white54, fontSize: 12))), Text(_source, style: const TextStyle(color: gold, fontSize: 11.5))])),
-        Expanded(child: _loading ? const Center(child: CircularProgressIndicator(color: gold)) : _filtered.isEmpty ? Center(child: Padding(padding: const EdgeInsets.all(30), child: Text(_query.trim().isEmpty ? 'لا توجد مراجع مضافة في هذا القسم حاليًا' : 'لا توجد نتائج مطابقة', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)))) : RefreshIndicator(color: gold, onRefresh: _loadIndex, child: ListView.builder(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), itemCount: _filtered.length, itemBuilder: (_, index) {
-          final item = _filtered[index];
-          final id = '${item['id']}';
-          final progress = _progress[id];
-          final downloaded = _downloaded.contains(_fileName(item));
-          final author = '${item['author'] ?? ''}'.trim();
-          final description = _cleanBookSummary('${item['full_summary'] ?? item['description'] ?? ''}');
-          return Card(color: surface, margin: const EdgeInsets.only(bottom: 10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18), side: const BorderSide(color: Colors.white10)), child: Padding(padding: const EdgeInsets.all(10), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            _cover(item), const SizedBox(width: 10), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Text('${item['title'] ?? ''}', textAlign: TextAlign.right, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, height: 1.35)),
-              if (author.isNotEmpty) ...[const SizedBox(height: 4), Text(author, textAlign: TextAlign.right, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: gold, fontSize: 12.5, height: 1.3))],
-              if (description.isNotEmpty) ...[const SizedBox(height: 5), Text(description, textAlign: TextAlign.right, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white60, fontSize: 12, height: 1.35))],
-              if (progress != null) ...[const SizedBox(height: 8), LinearProgressIndicator(value: progress, color: gold, backgroundColor: Colors.white12, minHeight: 3), const SizedBox(height: 3), Text('${(progress * 100).round()}%', style: const TextStyle(color: Colors.white54, fontSize: 10))],
-            ])), const SizedBox(width: 4), Column(children: [IconButton(tooltip: 'نبذة عن الكتاب', icon: const Icon(Icons.info_outline_rounded, color: gold), onPressed: () => _showBookSummary(item)), IconButton(tooltip: downloaded ? 'فتح المرجع' : 'تنزيل المرجع', icon: Icon(downloaded ? Icons.menu_book_rounded : Icons.file_download_outlined, color: gold), onPressed: progress == null ? () => _download(item) : null)])])));
-        }))),
+        Padding(padding: const EdgeInsets.fromLTRB(12, 12, 12, 8), child: TextField(
+          controller: _search,
+          onChanged: (v) => setState(() => _query = v),
+          style: const TextStyle(color: Colors.white),
+          textDirection: TextDirection.rtl,
+          decoration: InputDecoration(
+            hintText: 'ابحث باسم الكتاب أو المؤلف أو الموضوع', hintStyle: const TextStyle(color: Colors.white38),
+            prefixIcon: const Icon(Icons.search, color: Color(0xFFD4AF37)),
+            filled: true, fillColor: const Color(0xFF2A1A10),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+          ),
+        )),
+        SizedBox(height: 46, child: ListView.separated(
+          padding: const EdgeInsets.symmetric(horizontal: 12), scrollDirection: Axis.horizontal,
+          itemCount: _sections.length, separatorBuilder: (_, __) => const SizedBox(width: 8),
+          itemBuilder: (_, i) => ChoiceChip(
+            label: Text(_sections[i]), selected: _section == _sections[i], onSelected: (_) => setState(() => _section = _sections[i]),
+            selectedColor: const Color(0xFFD4AF37), backgroundColor: const Color(0xFF2A1A10), labelStyle: TextStyle(color: _section == _sections[i] ? Colors.black : Colors.white70, fontWeight: FontWeight.bold),
+          ),
+        )),
+        Expanded(child: _loading && _items.isEmpty
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37)))
+          : visible.isEmpty
+            ? Center(child: Text('لا توجد نتائج مطابقة في هذا القسم', style: TextStyle(color: Colors.white.withOpacity(.65))))
+            : ListView.builder(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 24), itemCount: visible.length,
+                itemBuilder: (_, i) => _bookCard(visible[i]),
+              )),
       ]),
     );
   }
-}
 
-class _ReferencePdfViewer extends StatelessWidget {
-  final String filePath;
-  final String title;
-  const _ReferencePdfViewer({required this.filePath, required this.title});
-
-  @override
-  Widget build(BuildContext context) => Scaffold(backgroundColor: Colors.black, appBar: AppBar(backgroundColor: const Color(0xFF1A1A1A), title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFFF0D78A), fontSize: 15)), iconTheme: const IconThemeData(color: Color(0xFFD4AF37))), body: PDFView(filePath: filePath, enableSwipe: true, swipeHorizontal: false, autoSpacing: true, pageFling: true, fitPolicy: FitPolicy.BOTH));
+  Widget _bookCard(Map<String, dynamic> item) {
+    final id = '${item['id']}';
+    final downloaded = _downloaded.contains(_fileName(item));
+    final progress = _progress[id];
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: const Color(0xB31F140D), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0x88D4AF37))),
+      child: Row(children: [
+        SizedBox(width: 72, height: 96, child: _cover(item)),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Text('${item['title'] ?? 'مرجع قانوني'}', textAlign: TextAlign.right, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, height: 1.35)),
+          const SizedBox(height: 5),
+          Text('${item['author'] ?? ''}', textAlign: TextAlign.right, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFFE5BE72), fontSize: 12)),
+          const SizedBox(height: 8),
+          Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+            IconButton(tooltip: 'معلومات الكتاب', onPressed: () => _showInfo(item), icon: const Icon(Icons.info_outline_rounded, color: Color(0xFFD4AF37))),
+            if (progress != null) SizedBox(width: 34, height: 34, child: CircularProgressIndicator(value: progress, color: const Color(0xFFD4AF37), strokeWidth: 3))
+            else IconButton(tooltip: downloaded ? 'فتح الكتاب' : 'تنزيل الكتاب', onPressed: () => _download(item), icon: Icon(downloaded ? Icons.menu_book_rounded : Icons.download_rounded, color: const Color(0xFFD4AF37))),
+          ]),
+        ])),
+      ]),
+    );
+  }
 }
