@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 const kLegalReferencesIndexUrl = 'https://raw.githubusercontent.com/ghgfcrcgrf57566-beep/Encyclopedia-of-Yemeni-Law/main/legal_references.json';
+const kLegalReferencesAdditionalIndexUrl = 'https://raw.githubusercontent.com/ghgfcrcgrf57566-beep/Encyclopedia-of-Yemeni-Law/main/legal_references_additional.json';
 
 class LegalReferencesScreen extends StatefulWidget {
   const LegalReferencesScreen({super.key});
@@ -17,7 +18,7 @@ class LegalReferencesScreen extends StatefulWidget {
 }
 
 class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
-  static const _cacheKey = 'cached_legal_references_json_v2';
+  static const _cacheKey = 'cached_legal_references_json_v3';
   final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 15),
     receiveTimeout: const Duration(seconds: 60),
@@ -52,6 +53,19 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
     } catch (_) {
       return [];
     }
+  }
+
+  List<Map<String, dynamic>> _mergeUnique(
+    List<Map<String, dynamic>> base,
+    List<Map<String, dynamic>> extra,
+  ) {
+    final out = <Map<String, dynamic>>[];
+    final seen = <String>{};
+    for (final item in [...base, ...extra]) {
+      final id = '${item['id'] ?? ''}'.trim();
+      if (id.isEmpty || seen.add(id)) out.add(item);
+    }
+    return out;
   }
 
   void _apply(List<Map<String, dynamic>> v) {
@@ -100,17 +114,38 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
         _source = 'نسخة محفوظة محليًا';
       }
     }
+
     try {
-      final r = await _dio.get<String>(kLegalReferencesIndexUrl);
-      if (r.statusCode == 200 && r.data != null) {
-        final v = _parse(r.data!);
-        if (v.isNotEmpty) {
-          await prefs.setString(_cacheKey, jsonEncode(v));
-          _apply(v);
-          _source = 'محدّث من GitHub';
-        }
+      final results = await Future.wait([
+        _dio.get<String>(kLegalReferencesIndexUrl),
+        _dio.get<String>(kLegalReferencesAdditionalIndexUrl),
+      ]);
+      final base = results[0].statusCode == 200 && results[0].data != null
+          ? _parse(results[0].data!)
+          : <Map<String, dynamic>>[];
+      final extra = results[1].statusCode == 200 && results[1].data != null
+          ? _parse(results[1].data!)
+          : <Map<String, dynamic>>[];
+      final merged = _mergeUnique(base, extra);
+      if (merged.isNotEmpty) {
+        await prefs.setString(_cacheKey, jsonEncode(merged));
+        _apply(merged);
+        _source = 'محدّث من GitHub';
       }
-    } catch (_) {}
+    } catch (_) {
+      try {
+        final r = await _dio.get<String>(kLegalReferencesIndexUrl);
+        if (r.statusCode == 200 && r.data != null) {
+          final v = _parse(r.data!);
+          if (v.isNotEmpty) {
+            await prefs.setString(_cacheKey, jsonEncode(v));
+            _apply(v);
+            _source = 'محدّث من GitHub';
+          }
+        }
+      } catch (_) {}
+    }
+
     await _refreshDownloaded();
     if (mounted) setState(() => _loading = false);
   }
