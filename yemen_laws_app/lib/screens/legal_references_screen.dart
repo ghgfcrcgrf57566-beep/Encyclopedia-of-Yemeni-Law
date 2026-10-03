@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 const kLegalReferencesIndexUrl = 'https://raw.githubusercontent.com/ghgfcrcgrf57566-beep/Encyclopedia-of-Yemeni-Law/main/legal_references.json';
 
@@ -16,7 +17,7 @@ class LegalReferencesScreen extends StatefulWidget {
 }
 
 class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
-  static const _cacheKey = 'cached_legal_references_json_v1';
+  static const _cacheKey = 'cached_legal_references_json_v2';
   final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 15),
     receiveTimeout: const Duration(seconds: 60),
@@ -71,6 +72,7 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
               x['author'],
               x['category'],
               x['description'],
+              x['source'],
             ].join(' ').toLowerCase().contains(q))
         .toList();
   }
@@ -135,7 +137,7 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
     }
     final url = '${x['pdf_url'] ?? ''}'.trim();
     if (url.isEmpty) {
-      _message('لا يوجد رابط للملف.');
+      _message('لا يوجد رابط مباشر للملف.');
       return;
     }
     final id = '${x['id']}';
@@ -164,7 +166,19 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
     } catch (_) {
       if (await temp.exists()) await temp.delete();
       if (mounted) setState(() => _progress.remove(id));
-      _message('تعذر تنزيل الملف. تأكد من رفع PDF في الإصدار v1.0.0 ثم حاول مرة أخرى.');
+      _message('تعذر تنزيل المرجع من المصدر. يمكنك فتح المصدر الأصلي والمحاولة منه.');
+    }
+  }
+
+  Future<void> _openSource(Map<String, dynamic> x) async {
+    final raw = '${x['source_url'] ?? ''}'.trim();
+    if (raw.isEmpty) {
+      _message('لا يوجد رابط للمصدر.');
+      return;
+    }
+    final uri = Uri.tryParse(raw);
+    if (uri == null || !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      _message('تعذر فتح المصدر.');
     }
   }
 
@@ -180,6 +194,31 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
     );
   }
 
+  Widget _bookIcon({required bool downloaded}) {
+    const gold = Color(0xFFD4AF37);
+    return Container(
+      width: 58,
+      height: 70,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF4A321D), Color(0xFF1E1711)],
+        ),
+        border: Border.all(color: gold.withValues(alpha: 0.55)),
+        boxShadow: const [
+          BoxShadow(color: Colors.black54, blurRadius: 8, offset: Offset(2, 3)),
+        ],
+      ),
+      child: Icon(
+        downloaded ? Icons.menu_book_rounded : Icons.auto_stories_rounded,
+        color: gold,
+        size: 31,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     const gold = Color(0xFFD4AF37);
@@ -191,10 +230,7 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
         backgroundColor: surface,
         title: const Text(
           'المراجع القانونية',
-          style: TextStyle(
-            color: Color(0xFFF0D78A),
-            fontWeight: FontWeight.w800,
-          ),
+          style: TextStyle(color: Color(0xFFF0D78A), fontWeight: FontWeight.w800),
         ),
         centerTitle: true,
         iconTheme: const IconThemeData(color: gold),
@@ -233,24 +269,16 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
                     style: const TextStyle(color: Colors.white54, fontSize: 12),
                   ),
                 ),
-                Text(
-                  _source,
-                  style: const TextStyle(color: gold, fontSize: 11.5),
-                ),
+                Text(_source, style: const TextStyle(color: gold, fontSize: 11.5)),
               ],
             ),
           ),
           Expanded(
             child: _loading
-                ? const Center(
-                    child: CircularProgressIndicator(color: gold),
-                  )
+                ? const Center(child: CircularProgressIndicator(color: gold))
                 : _filtered.isEmpty
                     ? const Center(
-                        child: Text(
-                          'لا توجد نتائج مطابقة',
-                          style: TextStyle(color: Colors.white70),
-                        ),
+                        child: Text('لا توجد نتائج مطابقة', style: TextStyle(color: Colors.white70)),
                       )
                     : RefreshIndicator(
                         color: gold,
@@ -263,7 +291,6 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
                             final id = '${x['id']}';
                             final p = _progress[id];
                             final d = _downloaded.contains(_name(x));
-
                             return Card(
                               color: surface,
                               margin: const EdgeInsets.only(bottom: 10),
@@ -271,47 +298,79 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
                                 borderRadius: BorderRadius.circular(18),
                                 side: const BorderSide(color: Colors.white10),
                               ),
-                              child: ListTile(
-                                contentPadding: const EdgeInsets.all(12),
-                                leading: p != null
-                                    ? SizedBox(
-                                        width: 42,
-                                        height: 42,
-                                        child: CircularProgressIndicator(
-                                          value: p,
-                                          color: gold,
-                                          strokeWidth: 3,
-                                        ),
-                                      )
-                                    : IconButton(
-                                        tooltip: d ? 'قراءة المرجع' : 'تنزيل المرجع',
-                                        onPressed: () => _download(x),
-                                        icon: Icon(
-                                          d ? Icons.menu_book_rounded : Icons.download_rounded,
-                                          color: gold,
-                                        ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(10),
+                                child: Row(
+                                  children: [
+                                    _bookIcon(downloaded: d),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        children: [
+                                          Text(
+                                            '${x['title'] ?? ''}',
+                                            textAlign: TextAlign.right,
+                                            maxLines: 3,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            '${x['author'] ?? ''} — ${x['category'] ?? ''}',
+                                            textAlign: TextAlign.right,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                          ),
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            '${x['description'] ?? ''}',
+                                            textAlign: TextAlign.right,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(color: Colors.white38, height: 1.4, fontSize: 11.5),
+                                          ),
+                                          if ('${x['source'] ?? ''}'.isNotEmpty)
+                                            Padding(
+                                              padding: const EdgeInsets.only(top: 5),
+                                              child: Text(
+                                                'المصدر: ${x['source']}',
+                                                textAlign: TextAlign.right,
+                                                style: const TextStyle(color: gold, fontSize: 10.5),
+                                              ),
+                                            ),
+                                        ],
                                       ),
-                                title: Text(
-                                  '${x['title'] ?? ''}',
-                                  textAlign: TextAlign.right,
-                                  maxLines: 3,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w800,
-                                  ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    if (p != null)
+                                      SizedBox(
+                                        width: 40,
+                                        height: 40,
+                                        child: CircularProgressIndicator(value: p, color: gold, strokeWidth: 3),
+                                      )
+                                    else
+                                      Column(
+                                        children: [
+                                          IconButton(
+                                            tooltip: d ? 'قراءة المرجع' : 'تنزيل المرجع',
+                                            onPressed: () => _download(x),
+                                            icon: Icon(
+                                              d ? Icons.menu_book_rounded : Icons.download_rounded,
+                                              color: gold,
+                                            ),
+                                          ),
+                                          if ('${x['source_url'] ?? ''}'.isNotEmpty)
+                                            IconButton(
+                                              tooltip: 'فتح المصدر الأصلي',
+                                              onPressed: () => _openSource(x),
+                                              icon: const Icon(Icons.public_rounded, color: Colors.white54, size: 21),
+                                            ),
+                                        ],
+                                      ),
+                                  ],
                                 ),
-                                subtitle: Text(
-                                  '${x['author'] ?? ''} — ${x['category'] ?? ''}\\n${x['description'] ?? ''}',
-                                  textAlign: TextAlign.right,
-                                  maxLines: 3,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: Colors.white54,
-                                    height: 1.5,
-                                  ),
-                                ),
-                                onTap: () => _download(x),
                               ),
                             );
                           },
