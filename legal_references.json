@@ -1,5 +1,49 @@
 [
   {
+    "id": "usul_al_qanun",
+    "title": "أصول القانون أو المدخل لدراسة القانون",
+    "author": "عبد الرزاق أحمد السنهوري وأحمد هشمت أبو ستيت",
+    "category": "مدخل إلى القانون",
+    "description": "مرجع قانوني عربي منشور سنة 1941، ومتاح للقراءة والتنزيل من مجموعة Arabic Collections Online.",
+    "source": "NYU / Columbia University Libraries",
+    "source_url": "https://sites.dlib.nyu.edu/viewer/books/columbia_aco002594/display?lang=ar",
+    "pdf_url": "https://mc.dlib.nyu.edu/files/books/columbia_aco002594/columbia_aco002594_lo.pdf",
+    "access": "public_domain"
+  },
+  {
+    "id": "masadir_al_haqq_01",
+    "title": "مصادر الحق في الفقه الإسلامي - الجزء الأول",
+    "author": "عبد الرزاق أحمد السنهوري",
+    "category": "الفقه والقانون المقارن",
+    "description": "دراسة مقارنة في الفقه الغربي الحديث، متاحة مجانًا من Arabic Collections Online.",
+    "source": "NYU / American University of Beirut",
+    "source_url": "https://sites.dlib.nyu.edu/viewer/books/aub_aco003908/display?lang=ar",
+    "pdf_url": "https://mc.dlib.nyu.edu/files/books/aub_aco003908/aub_aco003908_lo.pdf",
+    "access": "public_domain"
+  },
+  {
+    "id": "masadir_al_haqq_02",
+    "title": "مصادر الحق في الفقه الإسلامي - الجزء الثاني",
+    "author": "عبد الرزاق أحمد السنهوري",
+    "category": "الفقه والقانون المقارن",
+    "description": "الجزء الثاني من دراسة السنهوري في مصادر الحق، متاح مجانًا للقراءة والتنزيل.",
+    "source": "NYU / American University of Beirut",
+    "source_url": "https://sites.dlib.nyu.edu/viewer/books/aub_aco003909/display?lang=ar",
+    "pdf_url": "https://mc.dlib.nyu.edu/files/books/aub_aco003909/aub_aco003909_lo.pdf",
+    "access": "public_domain"
+  },
+  {
+    "id": "masadir_al_haqq_03",
+    "title": "مصادر الحق في الفقه الإسلامي - الجزء الثالث",
+    "author": "عبد الرزاق أحمد السنهوري",
+    "category": "الفقه والقانون المقارن",
+    "description": "الجزء الثالث من المرجع، متاح مجانًا من مكتبات عربية رقمية جامعية.",
+    "source": "NYU / American University of Beirut",
+    "source_url": "https://sites.dlib.nyu.edu/viewer/books/aub_aco003910/display?lang=ar",
+    "pdf_url": "https://mc.dlib.nyu.edu/files/books/aub_aco003910/aub_aco003910_lo.pdf",
+    "access": "public_domain"
+  },
+  {
     "id": "sanhouri_01",
     "title": "الجزء الأول: نظرية الالتزام بوجه عام (مصادر الالتزام)",
     "author": "السنهوري",
