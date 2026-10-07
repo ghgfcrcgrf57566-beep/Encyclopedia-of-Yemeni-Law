@@ -11,13 +11,13 @@ class _InheritanceCalculatorScreenState extends State<InheritanceCalculatorScree
   final _amountController = TextEditingController();
   String _deceasedGender = 'male';
   int _wives = 0;
-  bool _husband = true;
-  bool _father = true;
-  bool _mother = true;
-  bool _grandfather = false;
-  bool _grandmother = false;
-  int _sons = 1;
-  int _daughters = 1;
+  int _husband = 0;
+  int _father = 0;
+  int _mother = 0;
+  int _grandfather = 0;
+  int _grandmother = 0;
+  int _sons = 0;
+  int _daughters = 0;
   int _sonsOfSon = 0;
   int _daughtersOfSon = 0;
   int _fullBrothers = 0;
@@ -25,6 +25,10 @@ class _InheritanceCalculatorScreenState extends State<InheritanceCalculatorScree
   int _paternalBrothers = 0;
   int _paternalSisters = 0;
   int _maternalSiblings = 0;
+  int _fullUncles = 0;
+  int _paternalUncles = 0;
+  int _fullMaleCousins = 0;
+  int _paternalMaleCousins = 0;
   bool _showResult = false;
   InheritanceResult? _result;
 
@@ -44,11 +48,11 @@ class _InheritanceCalculatorScreenState extends State<InheritanceCalculatorScree
       estate: estate,
       deceasedMale: _deceasedGender == 'male',
       wives: _deceasedGender == 'male' ? _wives : 0,
-      husband: _deceasedGender == 'female' && _husband,
-      father: _father,
-      mother: _mother,
-      grandfather: _grandfather,
-      grandmother: _grandmother,
+      husband: _deceasedGender == 'female' && _husband > 0,
+      father: _father > 0,
+      mother: _mother > 0,
+      grandfather: _grandfather > 0,
+      grandmother: _grandmother > 0,
       sons: _sons,
       daughters: _daughters,
       sonsOfSon: _sonsOfSon,
@@ -58,6 +62,10 @@ class _InheritanceCalculatorScreenState extends State<InheritanceCalculatorScree
       paternalBrothers: _paternalBrothers,
       paternalSisters: _paternalSisters,
       maternalSiblings: _maternalSiblings,
+      fullUncles: _fullUncles,
+      paternalUncles: _paternalUncles,
+      fullMaleCousins: _fullMaleCousins,
+      paternalMaleCousins: _paternalMaleCousins,
     );
     setState(() {
       _result = InheritanceEngine.calculate(input);
@@ -77,61 +85,52 @@ class _InheritanceCalculatorScreenState extends State<InheritanceCalculatorScree
       body: Directionality(
         textDirection: TextDirection.rtl,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            _header('بيانات التركة'),
-            TextField(
-              controller: _amountController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-              decoration: _inputDecoration('قيمة التركة بعد التجهيز والدين والوصية', Icons.account_balance_wallet_outlined),
-            ),
-            const SizedBox(height: 18),
-            _header('جنس المتوفى'),
-            Row(children: [
-              Expanded(child: _gender('ذكر', 'male', Icons.male)),
-              const SizedBox(width: 10),
-              Expanded(child: _gender('أنثى', 'female', Icons.female)),
-            ]),
-            const SizedBox(height: 18),
-            _header('الزوج أو الزوجات'),
-            if (_deceasedGender == 'male')
-              _counter('عدد الزوجات', _wives, (v) => setState(() => _wives = v.clamp(0, 4)))
-            else
-              _switch('الزوج حي ومستحق', _husband, (v) => setState(() => _husband = v)),
-            const SizedBox(height: 8),
-            _header('الأصول'),
-            _switch('الأب حي ومستحق', _father, (v) => setState(() => _father = v)),
-            _switch('الأم حية ومستحقة', _mother, (v) => setState(() => _mother = v)),
-            _switch('الجد الصحيح حي ومستحق', _grandfather, (v) => setState(() => _grandfather = v)),
-            _switch('الجدة المستحقة', _grandmother, (v) => setState(() => _grandmother = v)),
-            const SizedBox(height: 8),
-            _header('الفروع'),
+        padding: const EdgeInsets.all(12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          _accordion('بيانات التركة والمتوفى', Icons.account_balance_wallet_rounded, [
+            TextField(controller: _amountController, keyboardType: const TextInputType.numberWithOptions(decimal: true), style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold), decoration: _inputDecoration('قيمة التركة بعد التجهيز والدين والوصية', Icons.account_balance_wallet_outlined)),
+            const SizedBox(height: 14),
+            Row(children: [Expanded(child: _gender('ذكر', 'male', Icons.male)), const SizedBox(width: 10), Expanded(child: _gender('أنثى', 'female', Icons.female))]),
+          ]),
+          _accordion('الأصول والزوج / الزوجات', Icons.family_restroom_rounded, [
+            if (_deceasedGender == 'male') _counter('عدد الزوجات', _wives, (v) => setState(() => _wives = v.clamp(0, 4)))
+            else _counter('الزوج', _husband, (v) => setState(() => _husband = v.clamp(0, 1))),
+            _counter('الأب', _father, (v) => setState(() => _father = v.clamp(0, 1))),
+            _counter('الأم', _mother, (v) => setState(() => _mother = v.clamp(0, 1))),
+            _counter('الجد الصحيح', _grandfather, (v) => setState(() => _grandfather = v.clamp(0, 1))),
+            _counter('الجدة', _grandmother, (v) => setState(() => _grandmother = v.clamp(0, 1))),
+          ]),
+          _accordion('الفروع والإخوة', Icons.groups_rounded, [
             _counter('الأبناء الذكور', _sons, (v) => setState(() => _sons = v.clamp(0, 50))),
             _counter('البنات', _daughters, (v) => setState(() => _daughters = v.clamp(0, 50))),
             _counter('أبناء الابن', _sonsOfSon, (v) => setState(() => _sonsOfSon = v.clamp(0, 50))),
             _counter('بنات الابن', _daughtersOfSon, (v) => setState(() => _daughtersOfSon = v.clamp(0, 50))),
-            const SizedBox(height: 8),
-            _header('الإخوة والأخوات'),
             _counter('الإخوة الأشقاء', _fullBrothers, (v) => setState(() => _fullBrothers = v.clamp(0, 50))),
             _counter('الأخوات الشقيقات', _fullSisters, (v) => setState(() => _fullSisters = v.clamp(0, 50))),
             _counter('الإخوة لأب', _paternalBrothers, (v) => setState(() => _paternalBrothers = v.clamp(0, 50))),
             _counter('الأخوات لأب', _paternalSisters, (v) => setState(() => _paternalSisters = v.clamp(0, 50))),
             _counter('الإخوة والأخوات لأم', _maternalSiblings, (v) => setState(() => _maternalSiblings = v.clamp(0, 50))),
-            const SizedBox(height: 20),
-            SizedBox(height: 52, child: ElevatedButton.icon(
-              onPressed: _calculate,
-              icon: const Icon(Icons.calculate_rounded, color: Colors.black),
-              label: const Text('احسب الأنصبة الشرعية', style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.bold)),
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-            )),
-            const SizedBox(height: 20),
-            if (_showResult && _result != null) _resultCard(_result!),
           ]),
-        ),
+          _accordion('الأعمام والعصبات', Icons.account_tree_rounded, [
+            _counter('العم الشقيق', _fullUncles, (v) => setState(() => _fullUncles = v.clamp(0, 50))),
+            _counter('العم لأب', _paternalUncles, (v) => setState(() => _paternalUncles = v.clamp(0, 50))),
+            _counter('ابن العم الشقيق', _fullMaleCousins, (v) => setState(() => _fullMaleCousins = v.clamp(0, 50))),
+            _counter('ابن العم لأب', _paternalMaleCousins, (v) => setState(() => _paternalMaleCousins = v.clamp(0, 50))),
+          ]),
+          const SizedBox(height: 8),
+          SizedBox(height: 52, child: ElevatedButton.icon(onPressed: _calculate, icon: const Icon(Icons.calculate_rounded, color: Colors.black), label: const Text('احسب الأنصبة الشرعية', style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.bold)), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD4AF37), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))))),
+          const SizedBox(height: 20),
+          if (_showResult && _result != null) _resultCard(_result!),
+        ]),
       ),
     );
   }
+
+  Widget _accordion(String title, IconData icon, List<Widget> children) => Container(
+    margin: const EdgeInsets.only(bottom: 10),
+    decoration: BoxDecoration(color: const Color(0xFF252525), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white10)),
+    child: Theme(data: Theme.of(context).copyWith(dividerColor: Colors.transparent), child: ExpansionTile(initiallyExpanded: false, tilePadding: const EdgeInsets.symmetric(horizontal: 14), childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12), leading: Icon(icon, color: const Color(0xFFD4AF37)), title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)), children: children)),
+  );
 
   InputDecoration _inputDecoration(String hint, IconData icon) => InputDecoration(
     hintText: hint, hintStyle: const TextStyle(color: Colors.white38, fontSize: 13), filled: true, fillColor: const Color(0xFF2A2A2A),
@@ -178,8 +177,8 @@ class _InheritanceCalculatorScreenState extends State<InheritanceCalculatorScree
 class InheritanceInput {
   final double estate;
   final bool deceasedMale, husband, father, mother, grandfather, grandmother;
-  final int wives, sons, daughters, sonsOfSon, daughtersOfSon, fullBrothers, fullSisters, paternalBrothers, paternalSisters, maternalSiblings;
-  const InheritanceInput({required this.estate, required this.deceasedMale, required this.wives, required this.husband, required this.father, required this.mother, required this.grandfather, required this.grandmother, required this.sons, required this.daughters, required this.sonsOfSon, required this.daughtersOfSon, required this.fullBrothers, required this.fullSisters, required this.paternalBrothers, required this.paternalSisters, required this.maternalSiblings});
+  final int wives, sons, daughters, sonsOfSon, daughtersOfSon, fullBrothers, fullSisters, paternalBrothers, paternalSisters, maternalSiblings, fullUncles, paternalUncles, fullMaleCousins, paternalMaleCousins;
+  const InheritanceInput({required this.estate, required this.deceasedMale, required this.wives, required this.husband, required this.father, required this.mother, required this.grandfather, required this.grandmother, required this.sons, required this.daughters, required this.sonsOfSon, required this.daughtersOfSon, required this.fullBrothers, required this.fullSisters, required this.paternalBrothers, required this.paternalSisters, required this.maternalSiblings, required this.fullUncles, required this.paternalUncles, required this.fullMaleCousins, required this.paternalMaleCousins});
 }
 
 class HeirShare {
