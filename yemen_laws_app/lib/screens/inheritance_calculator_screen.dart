@@ -125,6 +125,7 @@ class _InheritanceCalculatorScreenState extends State<InheritanceCalculatorScree
       ),
       ),
     );
+  }
 
   Widget _accordion(String title, IconData icon, List<Widget> children) => Container(
     margin: const EdgeInsets.only(bottom: 10),
