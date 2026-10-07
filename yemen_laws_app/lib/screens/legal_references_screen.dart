@@ -7,12 +7,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 const kLegalReferencesIndexUrl = 'https://raw.githubusercontent.com/ghgfcrcgrf57566-beep/Encyclopedia-of-Yemeni-Law/main/legal_references.json';
 const kLegalReferencesAdditionalIndexUrl = 'https://raw.githubusercontent.com/ghgfcrcgrf57566-beep/Encyclopedia-of-Yemeni-Law/main/legal_references_additional.json';
 const kLegalReferencesReligiousIndexUrl = 'https://raw.githubusercontent.com/ghgfcrcgrf57566-beep/Encyclopedia-of-Yemeni-Law/main/legal_references_religious.json';
 const kLegalReferencesExpandedIndexUrl = 'https://raw.githubusercontent.com/ghgfcrcgrf57566-beep/Encyclopedia-of-Yemeni-Law/main/legal_references_expanded.json';
 const kLegalReferencesExpanded2IndexUrl = 'https://raw.githubusercontent.com/ghgfcrcgrf57566-beep/Encyclopedia-of-Yemeni-Law/main/legal_references_expanded_2.json';
+const kLegalReferences100IndexUrl = 'https://raw.githubusercontent.com/ghgfcrcgrf57566-beep/Encyclopedia-of-Yemeni-Law/main/legal_references_100.json';
 
 const _sections = <String>[
   'مراجع قانونية',
@@ -29,7 +31,7 @@ class LegalReferencesScreen extends StatefulWidget {
 }
 
 class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
-  static const _cacheKey = 'cached_legal_references_json_v8';
+  static const _cacheKey = 'cached_legal_references_json_v9';
   final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 15),
     receiveTimeout: const Duration(seconds: 90),
@@ -68,7 +70,9 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
 
   bool _valid(Map<String, dynamic> item) {
     final pdf = '${item['pdf_url'] ?? ''}'.trim();
-    return pdf.isNotEmpty && Uri.tryParse(pdf)?.hasScheme == true;
+    final source = '${item['source_url'] ?? ''}'.trim();
+    final url = pdf.isNotEmpty ? pdf : source;
+    return url.isNotEmpty && Uri.tryParse(url)?.hasScheme == true;
   }
 
   List<Map<String, dynamic>> _merge(List<List<Map<String, dynamic>>> groups) {
@@ -136,6 +140,7 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
         _dio.get<String>(kLegalReferencesReligiousIndexUrl),
         _dio.get<String>(kLegalReferencesExpandedIndexUrl),
         _dio.get<String>(kLegalReferencesExpanded2IndexUrl),
+        _dio.get<String>(kLegalReferences100IndexUrl),
       ]);
       final groups = responses.map((r) => r.statusCode == 200 && r.data != null ? _parse(r.data!) : <Map<String, dynamic>>[]).toList();
       final merged = _merge(groups);
@@ -173,8 +178,15 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
       _openPdf(file.path, '${item['title'] ?? 'المرجع'}');
       return;
     }
-    final url = '${item['pdf_url'] ?? ''}'.trim();
-    if (url.isEmpty) return _message('لا يوجد ملف PDF مباشر لهذا المرجع.');
+    final pdfUrl = '${item['pdf_url'] ?? ''}'.trim();
+    final sourceUrl = '${item['source_url'] ?? ''}'.trim();
+    final url = pdfUrl.isNotEmpty ? pdfUrl : sourceUrl;
+    if (url.isEmpty) return _message('لا يوجد مصدر متاح لهذا المرجع.');
+    if (pdfUrl.isEmpty) {
+      final ok = await launchUrl(Uri.parse(sourceUrl), mode: LaunchMode.externalApplication);
+      if (!ok && mounted) _message('تعذر فتح مصدر الكتاب.');
+      return;
+    }
     final id = '${item['id']}';
     final temp = File('${file.path}.part');
     setState(() => _progress[id] = 0);
