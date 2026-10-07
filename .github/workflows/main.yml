@@ -19,6 +19,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
@@ -60,7 +62,14 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y pandoc
-          python3 tools/build_db.py --src "$GITHUB_WORKSPACE" --out assets/db/app_database.db
+          # القاعدة الملتزم بها سابقًا تحتوي القوانين الأصلية، ومنها المدني والمرافعات
+          # والدستور والتجاري وغيرها. نستخدمها كأساس، ثم نُحدّث القوانين التي لها ملفات
+          # Word جديدة ونضيف أي قانون جديد، بدل حذف المجموعة السابقة.
+          git show cc0321e0118f9afdec3812b4df30d5d5dcc4e118:yemen_laws_app/assets/db/app_database.db > /tmp/yemen_laws_base.db
+          python3 tools/build_db.py \
+            --src "$GITHUB_WORKSPACE" \
+            --base-db /tmp/yemen_laws_base.db \
+            --out assets/db/app_database.db
 
       - name: Install Flutter dependencies
         run: flutter pub get
