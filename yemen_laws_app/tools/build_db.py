@@ -3,6 +3,7 @@
 import argparse
 import os
 import re
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -334,26 +335,66 @@ CREATE INDEX idx_mawad_bab ON mawad(bab_id);
 """
 
 
-def build(src_dir: str, out_path: str):
-    if os.path.exists(out_path):
-        os.remove(out_path)
-    conn = sqlite3.connect(out_path)
-    conn.executescript(SCHEMA)
+def _remove_existing_law(conn, law_id: int):
+    cur = conn.cursor()
+    # نحذف الجداول التابعة يدويًا لأن بعض قواعد البيانات القديمة لم تُنشأ
+    # مع تفعيل foreign_keys، ثم نعيد بناء فهرس FTS في النهاية.
+    cur.execute("DELETE FROM favorites WHERE mada_id IN (SELECT id FROM mawad WHERE law_id=?)", (law_id,))
+    cur.execute("DELETE FROM article_notes WHERE mada_id IN (SELECT id FROM mawad WHERE law_id=?)", (law_id,))
+    cur.execute("DELETE FROM reading_history WHERE mada_id IN (SELECT id FROM mawad WHERE law_id=?)", (law_id,))
+    cur.execute("DELETE FROM mawad WHERE law_id=?", (law_id,))
+    cur.execute("DELETE FROM fusul WHERE law_id=?", (law_id,))
+    cur.execute("DELETE FROM abwab WHERE law_id=?", (law_id,))
+    cur.execute("DELETE FROM laws WHERE id=?", (law_id,))
     conn.commit()
 
-    order = 0
+
+def build(src_dir: str, out_path: str, base_db: str | None = None):
+    if base_db:
+        if not os.path.exists(base_db):
+            raise FileNotFoundError(f"قاعدة الأساس غير موجودة: {base_db}")
+        if os.path.abspath(base_db) != os.path.abspath(out_path):
+            os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
+            shutil.copy2(base_db, out_path)
+        conn = sqlite3.connect(out_path)
+        conn.execute("PRAGMA foreign_keys=OFF")
+        print(f"تم استخدام قاعدة الأساس: {base_db}")
+    else:
+        if os.path.exists(out_path):
+            os.remove(out_path)
+        conn = sqlite3.connect(out_path)
+        conn.executescript(SCHEMA)
+        conn.commit()
+
+    cur = conn.cursor()
+    cur.execute("SELECT COALESCE(MAX(order_num), 0) FROM laws")
+    next_order = cur.fetchone()[0]
+
     for filename, display_name, short_name, category in LAW_ORDER:
         path = os.path.join(src_dir, filename)
         if not os.path.exists(path):
             print(f"تحذير: الملف غير موجود، سيتم تخطيه: {filename}", file=sys.stderr)
             continue
 
-        order += 1
-        print(f"[{order:02d}] معالجة: {display_name}")
+        print(f"معالجة: {display_name}")
         raw = clean_text(read_file_text(path))
         tree = parse_law(raw)
 
-        cur = conn.cursor()
+        cur.execute(
+            "SELECT id, order_num FROM laws WHERE name=? OR short_name=?",
+            (display_name, short_name),
+        )
+        existing = cur.fetchone()
+
+        if existing:
+            law_id, law_order = existing
+            print(f"     -> استبدال النسخة السابقة مع الحفاظ على ترتيبها ({law_order})")
+            _remove_existing_law(conn, law_id)
+            order = law_order
+        else:
+            next_order += 1
+            order = next_order
+
         cur.execute(
             "INSERT INTO laws (name, short_name, category, order_num, articles_count) VALUES (?,?,?,?,0)",
             (display_name, short_name, category, order),
@@ -377,12 +418,17 @@ def build(src_dir: str, out_path: str):
     conn.execute("INSERT INTO mawad_fts(mawad_fts) VALUES ('rebuild')")
     conn.commit()
     conn.close()
-    print(f"\nتم إنشاء قاعدة البيانات: {out_path}")
+    print(f"\nتم تحديث قاعدة البيانات: {out_path}")
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--src", required=True, help="مجلد يحتوي ملفات القوانين")
     ap.add_argument("--out", default="app_database.db", help="مسار ملف قاعدة البيانات الناتج")
+    ap.add_argument(
+        "--base-db",
+        default=None,
+        help="قاعدة بيانات سابقة تُحافظ على القوانين القديمة وتُحدّث/تضيف القوانين من LAW_ORDER",
+    )
     args = ap.parse_args()
-    build(args.src, args.out)
+    build(args.src, args.out, args.base_db)
