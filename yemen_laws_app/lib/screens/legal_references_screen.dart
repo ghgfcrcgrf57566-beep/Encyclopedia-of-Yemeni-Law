@@ -9,12 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-const kLegalReferencesIndexUrl = 'https://raw.githubusercontent.com/ghgfcrcgrf57566-beep/Encyclopedia-of-Yemeni-Law/main/legal_references.json';
-const kLegalReferencesAdditionalIndexUrl = 'https://raw.githubusercontent.com/ghgfcrcgrf57566-beep/Encyclopedia-of-Yemeni-Law/main/legal_references_additional.json';
-const kLegalReferencesReligiousIndexUrl = 'https://raw.githubusercontent.com/ghgfcrcgrf57566-beep/Encyclopedia-of-Yemeni-Law/main/legal_references_religious.json';
-const kLegalReferencesExpandedIndexUrl = 'https://raw.githubusercontent.com/ghgfcrcgrf57566-beep/Encyclopedia-of-Yemeni-Law/main/legal_references_expanded.json';
-const kLegalReferencesExpanded2IndexUrl = 'https://raw.githubusercontent.com/ghgfcrcgrf57566-beep/Encyclopedia-of-Yemeni-Law/main/legal_references_expanded_2.json';
-const kLegalReferences100IndexUrl = 'https://raw.githubusercontent.com/ghgfcrcgrf57566-beep/Encyclopedia-of-Yemeni-Law/main/legal_references_100.json';
+const kLegalReferencesMergedIndexUrl = 'https://raw.githubusercontent.com/ghgfcrcgrf57566-beep/Encyclopedia-of-Yemeni-Law/main/legal_references/merged_books.json';
 
 const _sections = <String>[
   'مراجع قانونية',
@@ -31,7 +26,7 @@ class LegalReferencesScreen extends StatefulWidget {
 }
 
 class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
-  static const _cacheKey = 'cached_legal_references_json_v9';
+  static const _cacheKey = 'cached_legal_references_json_v11';
   final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 15),
     receiveTimeout: const Duration(seconds: 90),
@@ -134,19 +129,13 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
     }
 
     try {
-      final responses = await Future.wait([
-        _dio.get<String>(kLegalReferencesIndexUrl),
-        _dio.get<String>(kLegalReferencesAdditionalIndexUrl),
-        _dio.get<String>(kLegalReferencesReligiousIndexUrl),
-        _dio.get<String>(kLegalReferencesExpandedIndexUrl),
-        _dio.get<String>(kLegalReferencesExpanded2IndexUrl),
-        _dio.get<String>(kLegalReferences100IndexUrl),
-      ]);
-      final groups = responses.map((r) => r.statusCode == 200 && r.data != null ? _parse(r.data!) : <Map<String, dynamic>>[]).toList();
-      final merged = _merge(groups);
-      if (merged.isNotEmpty) {
-        await prefs.setString(_cacheKey, jsonEncode(merged));
-        if (mounted) setState(() => _items = merged);
+      final response = await _dio.get<String>(kLegalReferencesMergedIndexUrl);
+      if (response.statusCode == 200 && response.data != null) {
+        final merged = _merge([_parse(response.data!)]);
+        if (merged.isNotEmpty) {
+          await prefs.setString(_cacheKey, jsonEncode(merged));
+          if (mounted) setState(() => _items = merged);
+        }
       }
     } catch (_) {}
 
@@ -285,34 +274,64 @@ class _LegalReferencesScreenState extends State<LegalReferencesScreen> {
         title: const Text('المراجع القانونية', style: TextStyle(color: Color(0xFFE5BE72), fontWeight: FontWeight.bold)),
       ),
       body: Column(children: [
-        Padding(padding: const EdgeInsets.fromLTRB(12, 12, 12, 8), child: TextField(
-          controller: _search,
-          onChanged: (v) => setState(() => _query = v),
-          style: const TextStyle(color: Colors.white),
-          textDirection: TextDirection.rtl,
-          decoration: InputDecoration(
-            hintText: 'ابحث باسم الكتاب أو المؤلف أو الموضوع', hintStyle: const TextStyle(color: Colors.white38),
-            prefixIcon: const Icon(Icons.search, color: Color(0xFFD4AF37)),
-            filled: true, fillColor: const Color(0xFF2A1A10),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+          child: TextField(
+            controller: _search,
+            onChanged: (v) => setState(() => _query = v),
+            style: const TextStyle(color: Colors.white),
+            textDirection: TextDirection.rtl,
+            decoration: InputDecoration(
+              hintText: 'ابحث باسم الكتاب أو المؤلف أو الموضوع',
+              hintStyle: const TextStyle(color: Colors.white38),
+              prefixIcon: const Icon(Icons.search, color: Color(0xFFD4AF37)),
+              filled: true, fillColor: const Color(0xFF2A1A10),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+            ),
           ),
-        )),
-        SizedBox(height: 46, child: ListView.separated(
-          padding: const EdgeInsets.symmetric(horizontal: 12), scrollDirection: Axis.horizontal,
-          itemCount: _sections.length, separatorBuilder: (_, __) => const SizedBox(width: 8),
-          itemBuilder: (_, i) => ChoiceChip(
-            label: Text(_sections[i]), selected: _section == _sections[i], onSelected: (_) => setState(() => _section = _sections[i]),
-            selectedColor: const Color(0xFFD4AF37), backgroundColor: const Color(0xFF2A1A10), labelStyle: TextStyle(color: _section == _sections[i] ? Colors.black : Colors.white70, fontWeight: FontWeight.bold),
+        ),
+        SizedBox(
+          height: 46,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            scrollDirection: Axis.horizontal,
+            itemCount: _sections.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (_, i) => ChoiceChip(
+              label: Text(_sections[i]),
+              selected: _section == _sections[i],
+              onSelected: (_) => setState(() => _section = _sections[i]),
+              selectedColor: const Color(0xFFD4AF37),
+              backgroundColor: const Color(0xFF2A1A10),
+              labelStyle: TextStyle(
+                color: _section == _sections[i] ? Colors.black : Colors.white70,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
-        )),
-        Expanded(child: _loading && _items.isEmpty
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37)))
-          : visible.isEmpty
-            ? Center(child: Text('لا توجد نتائج مطابقة في هذا القسم', style: TextStyle(color: Colors.white.withOpacity(.65))))
-            : ListView.builder(
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 24), itemCount: visible.length,
-                itemBuilder: (_, i) => _bookCard(visible[i]),
-              )),
+        ),
+        Expanded(
+          child: _loading && _items.isEmpty
+            ? const Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37)))
+            : visible.isEmpty
+              ? Center(child: Text('لا توجد نتائج مطابقة في هذا القسم', style: TextStyle(color: Colors.white.withOpacity(.65))))
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    final columns = constraints.maxWidth >= 700 ? 3 : 2;
+                    return GridView.builder(
+                      padding: const EdgeInsets.fromLTRB(10, 10, 10, 24),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: columns,
+                        crossAxisSpacing: 10,
+                        mainAxisSpacing: 10,
+                        childAspectRatio: columns == 2 ? .76 : .88,
+                      ),
+                      itemCount: visible.length,
+                      itemBuilder: (_, i) => _bookCard(visible[i]),
+                    );
+                  },
+                ),
+        ),
       ]),
     );
   }
