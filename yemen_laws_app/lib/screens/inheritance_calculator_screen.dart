@@ -154,6 +154,40 @@ class _InheritanceCalculatorScreenState extends State<InheritanceCalculatorScree
     child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(label, style: const TextStyle(color: Colors.white, fontSize: 14)), Row(children: [IconButton(onPressed: count > 0 ? () => onChanged(count - 1) : null, icon: const Icon(Icons.remove_circle_outline, color: Color(0xFFD4AF37))), Text('$count', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)), IconButton(onPressed: () => onChanged(count + 1), icon: const Icon(Icons.add_circle_outline, color: Color(0xFFD4AF37)))])]),
   );
 
+
+  Widget _buildShareRow(HeirShare s) {
+    final header = Row(children: [
+      Expanded(child: Text(s.heir, style: TextStyle(color: s.amount == 0 ? Colors.white54 : Colors.white, fontWeight: FontWeight.w600))),
+      Text(s.fraction, style: TextStyle(color: s.amount == 0 ? Colors.redAccent : const Color(0xFFD4AF37), fontSize: 12, fontWeight: FontWeight.bold)),
+      const SizedBox(width: 10),
+      Text(s.amount == 0 ? 'محجوب' : '${s.amount.toStringAsFixed(2)} ريال', style: TextStyle(color: s.amount == 0 ? Colors.redAccent : Colors.white, fontWeight: FontWeight.bold)),
+    ]);
+    if (s.details.isEmpty) {
+      return Padding(padding: const EdgeInsets.symmetric(vertical: 5), child: header);
+    }
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(color: Colors.black12, borderRadius: BorderRadius.circular(10)),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 8),
+          childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+          title: header,
+          trailing: const Icon(Icons.expand_more, color: Color(0xFFD4AF37)),
+          children: s.details.map((detail) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(children: [
+              const Icon(Icons.person_outline, size: 16, color: Color(0xFFD4AF37)),
+              const SizedBox(width: 7),
+              Expanded(child: Text(detail, style: const TextStyle(color: Colors.white70, fontSize: 13))),
+            ]),
+          )).toList(),
+        ),
+      ),
+    );
+  }
+
   Widget _switch(String label, bool value, ValueChanged<bool> onChanged) => Container(
     margin: const EdgeInsets.only(bottom: 6), decoration: BoxDecoration(color: const Color(0xFF2A2A2A), borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white10)),
     child: SwitchListTile(value: value, onChanged: onChanged, activeColor: const Color(0xFFD4AF37), title: Text(label, style: const TextStyle(color: Colors.white, fontSize: 14)), contentPadding: const EdgeInsets.symmetric(horizontal: 8),
@@ -168,15 +202,7 @@ class _InheritanceCalculatorScreenState extends State<InheritanceCalculatorScree
         Text(result.status, style: const TextStyle(color: Color(0xFFD4AF37), fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
       ],
-      ...result.shares.map((s) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 5),
-        child: Row(children: [
-          Expanded(child: Text(s.heir, style: TextStyle(color: s.amount == 0 ? Colors.white54 : Colors.white, fontWeight: FontWeight.w600))),
-          Text(s.fraction, style: TextStyle(color: s.amount == 0 ? Colors.redAccent : const Color(0xFFD4AF37), fontSize: 12, fontWeight: FontWeight.bold)),
-          const SizedBox(width: 10),
-          Text(s.amount == 0 ? 'محجوب' : '${s.amount.toStringAsFixed(2)} ريال', style: TextStyle(color: s.amount == 0 ? Colors.redAccent : Colors.white, fontWeight: FontWeight.bold)),
-        ]),
-      )),
+      ...result.shares.map(_buildShareRow),
       const SizedBox(height: 8),
       Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(8)), child: Text(result.note, style: const TextStyle(color: Colors.white60, fontSize: 11, height: 1.5))),
     ]),
@@ -193,7 +219,8 @@ class InheritanceInput {
 class HeirShare {
   final String heir, fraction;
   final double amount;
-  const HeirShare(this.heir, this.fraction, this.amount);
+  final List<String> details;
+  const HeirShare(this.heir, this.fraction, this.amount, {this.details = const []});
 }
 
 class InheritanceResult {
@@ -335,8 +362,65 @@ class InheritanceEngine {
 
     // عرض الحجب بعد الحساب فقط: لا نخفي أي وارث أثناء الإدخال.
     final output = <HeirShare>[];
+
+    List<String> individualDetails(String name, double totalAmount) {
+      String money(double value) => '${value.toStringAsFixed(2)} ريال';
+      if (i.deceasedMale && name.startsWith('الزوجات (') && i.wives > 0) {
+        final each = totalAmount / i.wives;
+        return List.generate(i.wives, (index) => 'الزوجة ${index + 1}: ${money(each)}');
+      }
+      if (name.startsWith('الأبناء والبنات (') && (i.sons > 0 || i.daughters > 0)) {
+        final totalShares = i.sons * 2 + i.daughters;
+        final unit = totalShares == 0 ? 0 : totalAmount / totalShares;
+        return [
+          ...List.generate(i.sons, (index) => 'الابن ${index + 1}: ${money(unit * 2)} — سهمان'),
+          ...List.generate(i.daughters, (index) => 'البنت ${index + 1}: ${money(unit)} — سهم واحد'),
+        ];
+      }
+      if (name.startsWith('أبناء وبنات الابن (') && (i.sonsOfSon > 0 || i.daughtersOfSon > 0)) {
+        final totalShares = i.sonsOfSon * 2 + i.daughtersOfSon;
+        final unit = totalShares == 0 ? 0 : totalAmount / totalShares;
+        return [
+          ...List.generate(i.sonsOfSon, (index) => 'ابن الابن ${index + 1}: ${money(unit * 2)} — سهمان'),
+          ...List.generate(i.daughtersOfSon, (index) => 'بنت الابن ${index + 1}: ${money(unit)} — سهم واحد'),
+        ];
+      }
+      if (name.startsWith('الإخوة والأخوات الأشقاء (') && (i.fullBrothers > 0 || i.fullSisters > 0)) {
+        final totalShares = i.fullBrothers * 2 + i.fullSisters;
+        final unit = totalShares == 0 ? 0 : totalAmount / totalShares;
+        return [
+          ...List.generate(i.fullBrothers, (index) => 'الأخ الشقيق ${index + 1}: ${money(unit * 2)} — سهمان'),
+          ...List.generate(i.fullSisters, (index) => 'الأخت الشقيقة ${index + 1}: ${money(unit)} — سهم واحد'),
+        ];
+      }
+      if (name.startsWith('الإخوة والأخوات لأب (') && (i.paternalBrothers > 0 || i.paternalSisters > 0)) {
+        final totalShares = i.paternalBrothers * 2 + i.paternalSisters;
+        final unit = totalShares == 0 ? 0 : totalAmount / totalShares;
+        return [
+          ...List.generate(i.paternalBrothers, (index) => 'الأخ لأب ${index + 1}: ${money(unit * 2)} — سهمان'),
+          ...List.generate(i.paternalSisters, (index) => 'الأخت لأب ${index + 1}: ${money(unit)} — سهم واحد'),
+        ];
+      }
+      if (name.startsWith('الإخوة والأخوات لأم (') && i.maternalSiblings > 0) {
+        final each = totalAmount / i.maternalSiblings;
+        return List.generate(i.maternalSiblings, (index) => 'الوارث لأم ${index + 1}: ${money(each)} — سهم واحد');
+      }
+      if (name.startsWith('الأخوات الشقيقات (') && i.fullSisters > 0) {
+        final each = totalAmount / i.fullSisters;
+        return List.generate(i.fullSisters, (index) => 'الأخت الشقيقة ${index + 1}: ${money(each)}');
+      }
+      if (name.startsWith('الأخوات لأب (') && i.paternalSisters > 0) {
+        final each = totalAmount / i.paternalSisters;
+        return List.generate(i.paternalSisters, (index) => 'الأخت لأب ${index + 1}: ${money(each)}');
+      }
+      return const [];
+    }
+
     shares.forEach((name, b) {
-      if (b.share > 0.0000001) output.add(HeirShare(name, b.fraction, i.estate * b.share));
+      if (b.share > 0.0000001) {
+        final amount = i.estate * b.share;
+        output.add(HeirShare(name, b.fraction, amount, details: individualDetails(name, amount)));
+      }
     });
     final blocked = <HeirShare>[];
     void blockedIf(bool condition, String name, String reason) {
