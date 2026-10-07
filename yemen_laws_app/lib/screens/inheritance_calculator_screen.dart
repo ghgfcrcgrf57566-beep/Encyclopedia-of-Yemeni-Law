@@ -123,8 +123,8 @@ class _InheritanceCalculatorScreenState extends State<InheritanceCalculatorScree
           if (_showResult && _result != null) _resultCard(_result!),
         ]),
       ),
+      ),
     );
-  }
 
   Widget _accordion(String title, IconData icon, List<Widget> children) => Container(
     margin: const EdgeInsets.only(bottom: 10),
@@ -358,7 +358,7 @@ class InheritanceEngine {
       blockedIf(i.fullBrothers > 0, 'الإخوة الأشقاء', 'محجوبون بالأب أو الجد الصحيح.');
       blockedIf(i.paternalBrothers > 0, 'الإخوة لأب', 'محجوبون بالأب أو الجد الصحيح.');
     }
-    if (i.mother) blockedIf(i.grandmother > 0, 'الجدة', 'محجوبة بالأم.');
+    if (i.mother) blockedIf(i.grandmother, 'الجدة', 'محجوبة بالأم.');
     if (i.maternalSiblings > 0 && (hasDesc || i.father || i.grandfather)) {
       blockedIf(true, 'الإخوة والأخوات لأم', 'محجوبون بالفرع الوارث أو الأصل الذكر.');
     }
