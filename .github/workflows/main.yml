@@ -55,6 +55,13 @@ jobs:
       - name: Verify Flutter and Android toolchain
         run: flutter doctor -v || true
 
+      - name: Build local legal database from Word files
+        working-directory: ${{ github.workspace }}/yemen_laws_app
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc
+          python3 tools/build_db.py --src "$GITHUB_WORKSPACE" --out assets/db/app_database.db
+
       - name: Install Flutter dependencies
         run: flutter pub get
 
