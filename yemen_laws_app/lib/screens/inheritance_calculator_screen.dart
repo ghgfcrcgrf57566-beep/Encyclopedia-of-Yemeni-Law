@@ -167,7 +167,15 @@ class _InheritanceCalculatorScreenState extends State<InheritanceCalculatorScree
         Text(result.status, style: const TextStyle(color: Color(0xFFD4AF37), fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
       ],
-      ...result.shares.map((s) => Padding(padding: const EdgeInsets.symmetric(vertical: 5), child: Row(children: [Expanded(child: Text(s.heir, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600))), Text(s.fraction, style: const TextStyle(color: Color(0xFFD4AF37), fontSize: 12)), const SizedBox(width: 10), Text('${s.amount.toStringAsFixed(2)} ريال', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))]))),
+      ...result.shares.map((s) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Row(children: [
+          Expanded(child: Text(s.heir, style: TextStyle(color: s.amount == 0 ? Colors.white54 : Colors.white, fontWeight: FontWeight.w600))),
+          Text(s.fraction, style: TextStyle(color: s.amount == 0 ? Colors.redAccent : const Color(0xFFD4AF37), fontSize: 12, fontWeight: FontWeight.bold)),
+          const SizedBox(width: 10),
+          Text(s.amount == 0 ? 'محجوب' : '${s.amount.toStringAsFixed(2)} ريال', style: TextStyle(color: s.amount == 0 ? Colors.redAccent : Colors.white, fontWeight: FontWeight.bold)),
+        ]),
+      )),
       const SizedBox(height: 8),
       Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(8)), child: Text(result.note, style: const TextStyle(color: Colors.white60, fontSize: 11, height: 1.5))),
     ]),
@@ -324,12 +332,42 @@ class InheritanceEngine {
       }
     }
 
-    // تحويل النسب إلى مبالغ مع حذف العناصر التي بقيت صفراً.
+    // عرض الحجب بعد الحساب فقط: لا نخفي أي وارث أثناء الإدخال.
     final output = <HeirShare>[];
     shares.forEach((name, b) {
       if (b.share > 0.0000001) output.add(HeirShare(name, b.fraction, i.estate * b.share));
     });
-    output.sort((a, b) => b.amount.compareTo(a.amount));
+    final blocked = <HeirShare>[];
+    void blockedIf(bool condition, String name, String reason) {
+      if (condition) blocked.add(HeirShare('$name — $reason', 'محجوب', 0));
+    }
+    if (i.sons > 0) {
+      blockedIf(i.fullUncles > 0, 'العم الشقيق', 'محجوب بالابن الذكر.');
+      blockedIf(i.paternalUncles > 0, 'العم لأب', 'محجوب بالابن الذكر.');
+      blockedIf(i.fullMaleCousins > 0, 'ابن العم الشقيق', 'محجوب بالابن الذكر.');
+      blockedIf(i.paternalMaleCousins > 0, 'ابن العم لأب', 'محجوب بالابن الذكر.');
+      blockedIf(i.fullBrothers > 0, 'الإخوة الأشقاء', 'محجوبون بالابن الذكر.');
+      blockedIf(i.paternalBrothers > 0, 'الإخوة لأب', 'محجوبون بالابن الذكر.');
+    } else {
+      blockedIf(i.fullUncles > 0 && (i.father || i.grandfather), 'العم الشقيق', 'محجوب بالأب أو الجد الصحيح.');
+      blockedIf(i.paternalUncles > 0 && (i.father || i.grandfather || i.fullUncles > 0), 'العم لأب', 'محجوب بالأب أو الجد الصحيح أو العم الشقيق.');
+      blockedIf(i.fullMaleCousins > 0 && (i.father || i.grandfather || i.fullUncles > 0), 'ابن العم الشقيق', 'محجوب بمن هو أقرب منه من العصبات.');
+      blockedIf(i.paternalMaleCousins > 0 && (i.father || i.grandfather || i.fullUncles > 0 || i.fullMaleCousins > 0 || i.paternalUncles > 0), 'ابن العم لأب', 'محجوب بمن هو أقرب منه من العصبات.');
+    }
+    if (i.father || i.grandfather) {
+      blockedIf(i.fullBrothers > 0, 'الإخوة الأشقاء', 'محجوبون بالأب أو الجد الصحيح.');
+      blockedIf(i.paternalBrothers > 0, 'الإخوة لأب', 'محجوبون بالأب أو الجد الصحيح.');
+    }
+    if (i.mother) blockedIf(i.grandmother > 0, 'الجدة', 'محجوبة بالأم.');
+    if (i.maternalSiblings > 0 && (hasDesc || i.father || i.grandfather)) {
+      blockedIf(true, 'الإخوة والأخوات لأم', 'محجوبون بالفرع الوارث أو الأصل الذكر.');
+    }
+    output.addAll(blocked);
+    output.sort((a, b) {
+      if (a.amount == 0 && b.amount != 0) return 1;
+      if (a.amount != 0 && b.amount == 0) return -1;
+      return b.amount.compareTo(a.amount);
+    });
 
     if (remainder > 0.000001) notes.add('بقي جزء من التركة دون وارث مُدخل في الحاسبة؛ أضف بقية الورثة إن وجدوا.');
     final note = notes.isEmpty
