@@ -361,6 +361,26 @@ class _LibraryScreenState extends State<LibraryScreen> {
     appBar: AppBar(
       backgroundColor: const Color(0xFF21150D), centerTitle: true,
       title: const Text('المكتبة', style: TextStyle(color: Color(0xFFE5BE72), fontWeight: FontWeight.bold)),
+      actions: [
+        IconButton(
+          tooltip: 'مدير التنزيلات',
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => _DownloadManagerScreen(
+              items: _libraryItems,
+              downloaded: _downloaded,
+              progress: _progress,
+              onDownload: _download,
+              onPause: _pause,
+              onDelete: _deleteLocal,
+              onOpen: (item) async {
+                final file = await _file(item);
+                if (await file.exists() && mounted) _openPdf(file.path, (item['title'] ?? 'الكتاب').toString());
+              },
+            ),
+          )),
+          icon: const Icon(Icons.download_for_offline_rounded, color: Color(0xFFD4AF37)),
+        ),
+      ],
     ),
     body: _loading && _items.isEmpty
       ? const Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37)))
