@@ -676,6 +676,98 @@ class _BookListScreenState extends State<_BookListScreen> {
   }
 }
 
+class _DownloadManagerScreen extends StatelessWidget {
+  final List<Map<String, dynamic>> items;
+  final Set<String> downloaded;
+  final Map<String, double> progress;
+  final Future<void> Function(Map<String, dynamic>) onDownload;
+  final Future<void> Function(Map<String, dynamic>) onPause;
+  final Future<void> Function(Map<String, dynamic>) onDelete;
+  final Future<void> Function(Map<String, dynamic>) onOpen;
+
+  const _DownloadManagerScreen({
+    required this.items,
+    required this.downloaded,
+    required this.progress,
+    required this.onDownload,
+    required this.onPause,
+    required this.onDelete,
+    required this.onOpen,
+  });
+
+  String _fileName(Map<String, dynamic> item) =>
+      (item['id'] ?? item['title'] ?? 'reference').toString().replaceAll(RegExp(r'[^a-zA-Z0-9._-]+'), '_').toLowerCase() + '.pdf';
+
+  @override
+  Widget build(BuildContext context) {
+    final active = items.where((e) {
+      final id = (e['id'] ?? e['title'] ?? '').toString();
+      return downloaded.contains(_fileName(e)) || progress.containsKey(id);
+    }).toList();
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF120D09),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF21150D),
+        centerTitle: true,
+        title: const Text('مدير التنزيلات'),
+      ),
+      body: active.isEmpty
+          ? const Center(child: Text('لا توجد تنزيلات نشطة أو كتب محفوظة', style: TextStyle(color: Colors.white60)))
+          : ListView.separated(
+              padding: const EdgeInsets.all(12),
+              itemCount: active.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (_, i) {
+                final item = active[i];
+                final id = (item['id'] ?? item['title'] ?? '').toString();
+                final p = progress[id];
+                final done = downloaded.contains(_fileName(item));
+                return Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xB31F140D),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: const Color(0x66D4AF37)),
+                  ),
+                  child: Row(
+                    textDirection: TextDirection.rtl,
+                    children: [
+                      const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFFD4AF37), size: 38),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          (item['title'] ?? 'كتاب').toString(),
+                          textAlign: TextAlign.right,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      if (p != null)
+                        SizedBox(
+                          width: 38,
+                          height: 38,
+                          child: CircularProgressIndicator(value: p, color: const Color(0xFFD4AF37), strokeWidth: 3),
+                        ),
+                      IconButton(
+                        onPressed: p != null ? () => onPause(item) : done ? () => onOpen(item) : () => onDownload(item),
+                        icon: Icon(p != null ? Icons.pause_rounded : done ? Icons.menu_book_rounded : Icons.download_rounded, color: const Color(0xFFD4AF37)),
+                      ),
+                      if (done)
+                        IconButton(
+                          onPressed: () => onDelete(item),
+                          icon: const Icon(Icons.delete_outline_rounded, color: Colors.white54),
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
+    );
+  }
+}
+
 class _BookDetailsScreen extends StatelessWidget {
   final Map<String, dynamic> item;
   final bool favorite;
