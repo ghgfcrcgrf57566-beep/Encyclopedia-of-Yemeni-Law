@@ -146,26 +146,56 @@ class _LawHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: context.surfaceAlt,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: context.divider),
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => SequentialLawScreen(law: law)),
       ),
-      child: Row(
-        children: [
-          Icon(Icons.balance, color: context.accent, size: 28),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              '${law.articlesCount} مادة قانونية${law.category != null ? ' • ${law.category}' : ''}',
-              textAlign: TextAlign.right,
-              style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.w600),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: context.surfaceAlt,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: context.divider),
+        ),
+        child: Row(
+          textDirection: TextDirection.rtl,
+          children: [
+            Icon(Icons.menu_book_rounded, color: context.accent, size: 34),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '${law.articlesCount} مادة قانونية${law.category != null ? ' • ${law.category}' : ''}',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 7),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Icon(Icons.menu_book_rounded, color: context.accent, size: 20),
+                      const SizedBox(width: 7),
+                      Text(
+                        'اضغط للقراءة الكاملة',
+                        style: TextStyle(
+                          color: context.accent,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+            const SizedBox(width: 10),
+            Icon(Icons.chevron_left_rounded, color: context.textSecondary, size: 28),
+          ],
+        ),
       ),
     );
   }
