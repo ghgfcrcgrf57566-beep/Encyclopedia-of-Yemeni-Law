@@ -329,6 +329,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
       categoryOf: sharia ? _shariaCategory : _legalCategory,
       sharia: sharia,
       onDownload: _download,
+      onPause: _pause,
       downloaded: _downloaded,
       progress: _progress,
       onInfo: _showInfo,
@@ -380,13 +381,14 @@ class _CategoryScreen extends StatelessWidget {
   final String Function(Map<String, dynamic>) categoryOf;
   final bool sharia;
   final Future<void> Function(Map<String, dynamic>) onDownload;
+  final Future<void> Function(Map<String, dynamic>) onPause;
   final Set<String> downloaded;
   final Map<String, double> progress;
   final void Function(Map<String, dynamic>) onInfo;
 
   const _CategoryScreen({
     required this.title, required this.categories, required this.items, required this.categoryOf,
-    required this.sharia, required this.onDownload, required this.downloaded, required this.progress, required this.onInfo,
+    required this.sharia, required this.onDownload, required this.onPause, required this.downloaded, required this.progress, required this.onInfo,
   });
 
   List<Map<String, dynamic>> _itemsFor(String category) => items.where((e) =>
@@ -442,7 +444,7 @@ class _CategoryScreen extends StatelessWidget {
         final c = categories[i];
         final count = _itemsFor(c.title).length;
         return _CategoryCard(category: c, count: count, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => _BookListScreen(
-          title: c.title, items: _itemsFor(c.title), onDownload: onDownload, downloaded: downloaded, progress: progress, onInfo: onInfo,
+          title: c.title, items: _itemsFor(c.title), onDownload: onDownload, onPause: onPause, downloaded: downloaded, progress: progress, onInfo: onInfo,
           isSanhouriHub: c.title == 'الشروح والموسوعات' && !sharia,
         ))));
       },
@@ -454,6 +456,7 @@ class _BookListScreen extends StatefulWidget {
   final String title;
   final List<Map<String, dynamic>> items;
   final Future<void> Function(Map<String, dynamic>) onDownload;
+  final Future<void> Function(Map<String, dynamic>) onPause;
   final Set<String> downloaded;
   final Map<String, double> progress;
   final void Function(Map<String, dynamic>) onInfo;
@@ -463,6 +466,7 @@ class _BookListScreen extends StatefulWidget {
     required this.title,
     required this.items,
     required this.onDownload,
+    required this.onPause,
     required this.downloaded,
     required this.progress,
     required this.onInfo,
@@ -633,6 +637,7 @@ class _BookListScreenState extends State<_BookListScreen> {
                           downloaded: _downloaded(all[i]),
                           progress: widget.progress,
                           onDownload: widget.onDownload,
+                          onPause: widget.onPause,
                           onInfo: widget.onInfo,
                         ),
                       )
@@ -645,6 +650,7 @@ class _BookListScreenState extends State<_BookListScreen> {
                           downloaded: _downloaded(all[i]),
                           progress: widget.progress,
                           onDownload: widget.onDownload,
+                          onPause: widget.onPause,
                           onInfo: widget.onInfo,
                         ),
                       ),
@@ -660,6 +666,7 @@ class _BookListScreenState extends State<_BookListScreen> {
         title: title,
         items: items,
         onDownload: widget.onDownload,
+        onPause: widget.onPause,
         downloaded: widget.downloaded,
         progress: widget.progress,
         onInfo: widget.onInfo,
@@ -1155,7 +1162,7 @@ class _CollectionCard extends StatelessWidget {
 class _BookCard extends StatelessWidget {
   final Map<String, dynamic> item; final Set<String> downloaded; final Map<String, double> progress;
   final Future<void> Function(Map<String, dynamic>) onDownload; final void Function(Map<String, dynamic>) onInfo;
-  const _BookCard({required this.item, required this.downloaded, required this.progress, required this.onDownload, required this.onInfo});
+  const _BookCard({required this.item, required this.downloaded, required this.progress, required this.onDownload, required this.onPause, required this.onInfo});
 
   String _fileName() => (item['id'] ?? 'reference').toString().replaceAll(RegExp(r'[^a-zA-Z0-9._-]+'), '_').toLowerCase() + '.pdf';
 
@@ -1179,8 +1186,10 @@ class _BookCard extends StatelessWidget {
           const SizedBox(height: 8),
           Row(mainAxisAlignment: MainAxisAlignment.end, children: [
             IconButton(tooltip: 'معلومات الكتاب', onPressed: () => onInfo(item), icon: const Icon(Icons.info_outline_rounded, color: Color(0xFFD4AF37))),
-            if (p != null) SizedBox(width: 32, height: 32, child: CircularProgressIndicator(value: p, color: const Color(0xFFD4AF37), strokeWidth: 3))
-            else IconButton(tooltip: done ? 'فتح الكتاب' : 'تنزيل الكتاب', onPressed: () => onDownload(item), icon: Icon(done ? Icons.menu_book_rounded : Icons.download_rounded, color: const Color(0xFFD4AF37))),
+            if (p != null) ...[
+              SizedBox(width: 32, height: 32, child: CircularProgressIndicator(value: p, color: const Color(0xFFD4AF37), strokeWidth: 3)),
+              IconButton(tooltip: 'إيقاف مؤقت', onPressed: () => onPause(item), icon: const Icon(Icons.pause_rounded, color: Colors.white70)),
+            ] else IconButton(tooltip: done ? 'فتح الكتاب' : 'تنزيل الكتاب', onPressed: () => onDownload(item), icon: Icon(done ? Icons.menu_book_rounded : Icons.download_rounded, color: const Color(0xFFD4AF37))),
           ]),
         ])),
       ]),
