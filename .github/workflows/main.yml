@@ -8,9 +8,15 @@ on:
 permissions:
   contents: read
 
+# لا نسمح بتراكم تشغيلات بناء قديمة؛ آخر push هو الذي يجب أن يُبنى.
+concurrency:
+  group: flutter-apk-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     defaults:
       run:
