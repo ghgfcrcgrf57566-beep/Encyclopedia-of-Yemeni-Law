@@ -338,28 +338,22 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   void _showInfo(Map<String, dynamic> item) {
-    final title = (item['title'] ?? 'الكتاب').toString();
-    final summary = (item['full_summary'] ?? item['description'] ?? '').toString().trim();
-    showModalBottomSheet<void>(
-      context: context, backgroundColor: const Color(0xFF21150D),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
-      builder: (_) => SafeArea(child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 22, 20, 28),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text(title, textAlign: TextAlign.right, style: const TextStyle(color: Color(0xFFE5BE72), fontSize: 20, fontWeight: FontWeight.w800)),
-          if ((item['author'] ?? '').toString().trim().isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Text('المؤلف: ' + item['author'].toString(), textAlign: TextAlign.right, style: const TextStyle(color: Colors.white70)),
-          ],
-          if (summary.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text(summary, textAlign: TextAlign.right, style: const TextStyle(color: Colors.white70, height: 1.6)),
-          ],
-          const SizedBox(height: 18),
-          FilledButton(onPressed: () => Navigator.pop(context), style: FilledButton.styleFrom(backgroundColor: const Color(0xFFD4AF37), foregroundColor: Colors.black), child: const Text('إغلاق')),
-        ]),
-      )),
-    );
+    final id = (item['id'] ?? item['title'] ?? '').toString();
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => _BookDetailsScreen(
+        item: item,
+        favorite: _favorites.contains(id),
+        downloaded: _downloaded.contains(_fileName(item)),
+        progress: _progress[id],
+        onFavorite: () => _toggleFavorite(item),
+        onDownload: () => _download(item),
+        onDelete: () => _deleteLocal(item),
+        onOpen: () async {
+          final file = await _file(item);
+          if (await file.exists() && mounted) _openPdf(file.path, (item['title'] ?? 'الكتاب').toString());
+        },
+      ),
+    ));
   }
 
   @override
@@ -467,16 +461,56 @@ class _BookListScreen extends StatefulWidget {
   final void Function(Map<String, dynamic>) onInfo;
   final bool isSanhouriHub;
 
-  const _BookListScreen({required this.title, required this.items, required this.onDownload, required this.downloaded, required this.progress, required this.onInfo, required this.isSanhouriHub});
+  const _BookListScreen({
+    required this.title,
+    required this.items,
+    required this.onDownload,
+    required this.downloaded,
+    required this.progress,
+    required this.onInfo,
+    required this.isSanhouriHub,
+  });
+
   @override
   State<_BookListScreen> createState() => _BookListScreenState();
 }
 
 class _BookListScreenState extends State<_BookListScreen> {
   String _query = '';
+  String _filter = 'الكل';
+  bool _grid = false;
+  Set<String> _favorites = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFavorites();
+  }
+
+  Future<void> _loadFavorites() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) setState(() => _favorites = (prefs.getStringList('library_favorites_v1') ?? []).toSet());
+  }
+
+  String _id(Map<String, dynamic> e) => (e['id'] ?? e['title'] ?? '').toString();
+
+  String _fileNameLocal(Map<String, dynamic> e) =>
+      _id(e).replaceAll(RegExp(r'[^a-zA-Z0-9._-]+'), '_').toLowerCase() + '.pdf';
+
+  bool _downloaded(Map<String, dynamic> e) => widget.downloaded.contains(_fileNameLocal(e));
+
   List<Map<String, dynamic>> get _filtered {
     final q = _query.trim().toLowerCase();
-    return widget.items.where((e) => q.isEmpty || [e['title'], e['author'], e['category'], e['description'], e['full_summary']].join(' ').toLowerCase().contains(q)).toList();
+    final result = widget.items.where((e) {
+      final text = [e['title'], e['author'], e['category'], e['description'], e['full_summary']].join(' ').toLowerCase();
+      if (q.isNotEmpty && !text.contains(q)) return false;
+      if (_filter == 'المفضلة' && !_favorites.contains(_id(e))) return false;
+      if (_filter == 'غير مقروء' && _downloaded(e)) return false;
+      if (_filter == 'قيد القراءة' && !_downloaded(e)) return false;
+      return true;
+    }).toList();
+    result.sort((a, b) => (a['title'] ?? '').toString().compareTo((b['title'] ?? '').toString()));
+    return result;
   }
 
   @override
@@ -490,28 +524,150 @@ class _BookListScreenState extends State<_BookListScreen> {
       final others = all.where((e) => !sanhouri.contains(e)).toList();
       return Scaffold(
         backgroundColor: const Color(0xFF120D09),
-        appBar: AppBar(backgroundColor: const Color(0xFF21150D), centerTitle: true, title: Text(widget.title, style: const TextStyle(color: Color(0xFFE5BE72), fontWeight: FontWeight.bold))),
-        body: ListView(padding: const EdgeInsets.all(12), children: [
-          if (sanhouri.isNotEmpty) _CollectionCard(title: 'السنهوري', subtitle: 'شرح القانون المدني وأعمال السنهوري', count: sanhouri.length, icon: Icons.auto_stories_rounded, onTap: () => _pushBooks(context, 'السنهوري', sanhouri)),
-          if (others.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            _CollectionCard(title: 'بقية الشروح والموسوعات', subtitle: 'الكتب القانونية الأخرى في هذا القسم', count: others.length, icon: Icons.library_books_rounded, onTap: () => _pushBooks(context, 'بقية الشروح والموسوعات', others)),
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF21150D),
+          centerTitle: true,
+          title: Text(widget.title, style: const TextStyle(color: Color(0xFFE5BE72), fontWeight: FontWeight.bold)),
+        ),
+        body: ListView(
+          padding: const EdgeInsets.all(12),
+          children: [
+            if (sanhouri.isNotEmpty)
+              _CollectionCard(
+                title: 'السنهوري',
+                subtitle: 'شروح السنهوري ومؤلفاته القانونية',
+                count: sanhouri.length,
+                icon: Icons.auto_stories_rounded,
+                onTap: () => _pushBooks(context, 'السنهوري', sanhouri),
+              ),
+            if (others.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _CollectionCard(
+                title: 'بقية الشروح والموسوعات',
+                subtitle: 'الكتب القانونية الأخرى في هذا القسم',
+                count: others.length,
+                icon: Icons.library_books_rounded,
+                onTap: () => _pushBooks(context, 'بقية الشروح والموسوعات', others),
+              ),
+            ],
           ],
-        ]),
+        ),
       );
     }
+
     return Scaffold(
       backgroundColor: const Color(0xFF120D09),
-      appBar: AppBar(backgroundColor: const Color(0xFF21150D), centerTitle: true, title: Text(widget.title, style: const TextStyle(color: Color(0xFFE5BE72), fontWeight: FontWeight.bold))),
-      body: Column(children: [
-        Padding(padding: const EdgeInsets.all(12), child: TextField(onChanged: (v) => setState(() => _query = v), style: const TextStyle(color: Colors.white), textDirection: TextDirection.rtl, decoration: InputDecoration(hintText: 'ابحث باسم الكتاب أو المؤلف', hintStyle: const TextStyle(color: Colors.white38), prefixIcon: const Icon(Icons.search, color: Color(0xFFD4AF37)), filled: true, fillColor: const Color(0xFF2A1A10), border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)))),
-        Expanded(child: all.isEmpty ? const Center(child: Text('لا توجد كتب متاحة في هذا التصنيف حاليًا', style: TextStyle(color: Colors.white60))) : ListView.separated(padding: const EdgeInsets.fromLTRB(10, 0, 10, 24), itemCount: all.length, separatorBuilder: (_, __) => const SizedBox(height: 10), itemBuilder: (_, i) => _BookCard(item: all[i], downloaded: widget.downloaded, progress: widget.progress, onDownload: widget.onDownload, onInfo: widget.onInfo))),
-      ]),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF21150D),
+        centerTitle: true,
+        title: Text(widget.title, style: const TextStyle(color: Color(0xFFE5BE72), fontWeight: FontWeight.bold)),
+        actions: [
+          IconButton(
+            tooltip: _grid ? 'عرض قائمة' : 'عرض شبكة',
+            onPressed: () => setState(() => _grid = !_grid),
+            icon: Icon(_grid ? Icons.view_list_rounded : Icons.grid_view_rounded, color: const Color(0xFFD4AF37)),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 5),
+            child: TextField(
+              onChanged: (v) => setState(() => _query = v),
+              style: const TextStyle(color: Colors.white),
+              textDirection: TextDirection.rtl,
+              decoration: InputDecoration(
+                hintText: 'ابحث باسم الكتاب أو المؤلف أو الموضوع',
+                hintStyle: const TextStyle(color: Colors.white38),
+                prefixIcon: const Icon(Icons.search, color: Color(0xFFD4AF37)),
+                filled: true,
+                fillColor: const Color(0xFF2A1A10),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+              ),
+            ),
+          ),
+          SizedBox(
+            height: 48,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              reverse: true,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              children: ['الكل', 'غير مقروء', 'قيد القراءة', 'المفضلة'].map((label) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                child: ChoiceChip(
+                  label: Text(label),
+                  selected: _filter == label,
+                  selectedColor: const Color(0xFFD4AF37),
+                  backgroundColor: const Color(0xFF21150D),
+                  labelStyle: TextStyle(color: _filter == label ? Colors.black : Colors.white70),
+                  onSelected: (_) => setState(() => _filter = label),
+                ),
+              )).toList(),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+            child: Row(
+              textDirection: TextDirection.rtl,
+              children: [
+                Text(all.length.toString() + ' كتاب', style: const TextStyle(color: Color(0xFFE5BE72), fontWeight: FontWeight.bold)),
+                const Spacer(),
+                const Text('ترتيب: العنوان', style: TextStyle(color: Colors.white54)),
+              ],
+            ),
+          ),
+          Expanded(
+            child: all.isEmpty
+                ? const Center(child: Text('لا توجد كتب مطابقة حاليًا', style: TextStyle(color: Colors.white60)))
+                : _grid
+                    ? GridView.builder(
+                        padding: const EdgeInsets.fromLTRB(10, 4, 10, 24),
+                        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 320,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                          childAspectRatio: .68,
+                        ),
+                        itemCount: all.length,
+                        itemBuilder: (_, i) => _BookCard(
+                          item: all[i],
+                          downloaded: _downloaded(all[i]),
+                          progress: widget.progress,
+                          onDownload: widget.onDownload,
+                          onInfo: widget.onInfo,
+                        ),
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(10, 4, 10, 24),
+                        itemCount: all.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
+                        itemBuilder: (_, i) => _BookCard(
+                          item: all[i],
+                          downloaded: _downloaded(all[i]),
+                          progress: widget.progress,
+                          onDownload: widget.onDownload,
+                          onInfo: widget.onInfo,
+                        ),
+                      ),
+          ),
+        ],
+      ),
     );
   }
 
   void _pushBooks(BuildContext context, String title, List<Map<String, dynamic>> items) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => _BookListScreen(title: title, items: items, onDownload: widget.onDownload, downloaded: widget.downloaded, progress: widget.progress, onInfo: widget.onInfo, isSanhouriHub: false)));
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => _BookListScreen(
+        title: title,
+        items: items,
+        onDownload: widget.onDownload,
+        downloaded: widget.downloaded,
+        progress: widget.progress,
+        onInfo: widget.onInfo,
+        isSanhouriHub: false,
+      ),
+    ));
   }
 }
 
