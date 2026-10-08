@@ -371,7 +371,7 @@ class InheritanceEngine {
       }
       if (name.startsWith('الأبناء والبنات (') && (i.sons > 0 || i.daughters > 0)) {
         final totalShares = i.sons * 2 + i.daughters;
-        final unit = totalShares == 0 ? 0 : totalAmount / totalShares;
+        final unit = totalShares == 0 ? 0.0 : totalAmount / totalShares;
         return [
           ...List.generate(i.sons, (index) => 'الابن ${index + 1}: ${money(unit * 2)} — سهمان'),
           ...List.generate(i.daughters, (index) => 'البنت ${index + 1}: ${money(unit)} — سهم واحد'),
@@ -379,7 +379,7 @@ class InheritanceEngine {
       }
       if (name.startsWith('أبناء وبنات الابن (') && (i.sonsOfSon > 0 || i.daughtersOfSon > 0)) {
         final totalShares = i.sonsOfSon * 2 + i.daughtersOfSon;
-        final unit = totalShares == 0 ? 0 : totalAmount / totalShares;
+        final unit = totalShares == 0 ? 0.0 : totalAmount / totalShares;
         return [
           ...List.generate(i.sonsOfSon, (index) => 'ابن الابن ${index + 1}: ${money(unit * 2)} — سهمان'),
           ...List.generate(i.daughtersOfSon, (index) => 'بنت الابن ${index + 1}: ${money(unit)} — سهم واحد'),
@@ -387,7 +387,7 @@ class InheritanceEngine {
       }
       if (name.startsWith('الإخوة والأخوات الأشقاء (') && (i.fullBrothers > 0 || i.fullSisters > 0)) {
         final totalShares = i.fullBrothers * 2 + i.fullSisters;
-        final unit = totalShares == 0 ? 0 : totalAmount / totalShares;
+        final unit = totalShares == 0 ? 0.0 : totalAmount / totalShares;
         return [
           ...List.generate(i.fullBrothers, (index) => 'الأخ الشقيق ${index + 1}: ${money(unit * 2)} — سهمان'),
           ...List.generate(i.fullSisters, (index) => 'الأخت الشقيقة ${index + 1}: ${money(unit)} — سهم واحد'),
@@ -395,7 +395,7 @@ class InheritanceEngine {
       }
       if (name.startsWith('الإخوة والأخوات لأب (') && (i.paternalBrothers > 0 || i.paternalSisters > 0)) {
         final totalShares = i.paternalBrothers * 2 + i.paternalSisters;
-        final unit = totalShares == 0 ? 0 : totalAmount / totalShares;
+        final unit = totalShares == 0 ? 0.0 : totalAmount / totalShares;
         return [
           ...List.generate(i.paternalBrothers, (index) => 'الأخ لأب ${index + 1}: ${money(unit * 2)} — سهمان'),
           ...List.generate(i.paternalSisters, (index) => 'الأخت لأب ${index + 1}: ${money(unit)} — سهم واحد'),
