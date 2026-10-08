@@ -52,7 +52,7 @@ class LibraryScreen extends StatefulWidget {
 }
 
 class _LibraryScreenState extends State<LibraryScreen> {
-  static const _cacheKey = 'cached_legal_references_json_v12';
+  static const _cacheKey = 'cached_legal_references_json_v13';
   final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 15),
     receiveTimeout: const Duration(seconds: 90),
@@ -60,6 +60,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
   ));
   List<Map<String, dynamic>> _items = [];
   final Map<String, double> _progress = {};
+  final Map<String, CancelToken> _tokens = {};
+  final Set<String> _favorites = {};
+  final Set<String> _reading = {};
   Set<String> _downloaded = {};
   bool _loading = true;
 
@@ -67,7 +70,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
   void initState() { super.initState(); _loadIndex(); }
 
   @override
-  void dispose() { _dio.close(force: true); super.dispose(); }
+  void dispose() {
+    for (final token in _tokens.values) token.cancel('library_disposed');
+    _dio.close(force: true);
+    super.dispose();
+  }
 
   List<Map<String, dynamic>> _parse(String raw) {
     try {
@@ -78,10 +85,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   bool _valid(Map<String, dynamic> item) {
-    final pdf = (item['pdf_url'] ?? '').toString().trim();
-    final source = (item['source_url'] ?? '').toString().trim();
-    final url = pdf.isNotEmpty ? pdf : source;
-    return url.isNotEmpty && Uri.tryParse(url)?.hasScheme == true;
+    // احتفظ بكل عناصر الفهرس حتى إذا لم تتوفر نسخة PDF.
+    return (item['id'] ?? item['title'] ?? '').toString().trim().isNotEmpty;
   }
 
   String _text(Map<String, dynamic> item) => [
@@ -158,6 +163,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
     final prefs = await SharedPreferences.getInstance();
     final cached = prefs.getString(_cacheKey);
     if (cached != null && mounted) setState(() => _items = _parse(cached).where(_valid).toList());
+    _favorites.addAll(prefs.getStringList('library_favorites_v1') ?? []);
+    _reading.addAll(prefs.getStringList('library_reading_v1') ?? []);
     try {
       final response = await _dio.get<String>(kLegalReferencesMergedIndexUrl);
       if (response.statusCode == 200 && response.data != null) {
@@ -170,6 +177,35 @@ class _LibraryScreenState extends State<LibraryScreen> {
     } catch (_) {}
     await _refreshDownloaded();
     if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _saveFlags() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('library_favorites_v1', _favorites.toList());
+    await prefs.setStringList('library_reading_v1', _reading.toList());
+  }
+
+  Future<void> _toggleFavorite(Map<String, dynamic> item) async {
+    final id = (item['id'] ?? item['title'] ?? '').toString();
+    setState(() {
+      if (!_favorites.add(id)) _favorites.remove(id);
+    });
+    await _saveFlags();
+  }
+
+  Future<void> _deleteLocal(Map<String, dynamic> item) async {
+    final file = await _file(item);
+    final part = File(file.path + '.part');
+    if (await file.exists()) await file.delete();
+    if (await part.exists()) await part.delete();
+    final id = (item['id'] ?? item['title'] ?? '').toString();
+    _tokens[id]?.cancel('deleted');
+    _tokens.remove(id);
+    setState(() {
+      _downloaded.remove(_fileName(item));
+      _progress.remove(id);
+    });
+    _message('تم حذف النسخة المحلية فقط، وبقي الكتاب في الفهرس.');
   }
 
   String _fileName(Map<String, dynamic> item) =>
@@ -192,34 +228,87 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   Future<void> _download(Map<String, dynamic> item) async {
     final file = await _file(item);
-    if (await file.exists()) { _openPdf(file.path, (item['title'] ?? 'الكتاب').toString()); return; }
-    final pdfUrl = (item['pdf_url'] ?? '').toString().trim();
-    final sourceUrl = (item['source_url'] ?? '').toString().trim();
-    if (pdfUrl.isEmpty) {
-      if (sourceUrl.isEmpty) return _message('لا يوجد مصدر رقمي متاح لهذا الكتاب حاليًا.');
-      final ok = await launchUrl(Uri.parse(sourceUrl), mode: LaunchMode.externalApplication);
-      if (!ok && mounted) _message('تعذر فتح مصدر الكتاب.');
+    if (await file.exists()) {
+      _openPdf(file.path, (item['title'] ?? 'الكتاب').toString());
       return;
     }
-    final id = (item['id'] ?? '').toString();
+    final pdfUrl = (item['pdf_url'] ?? item['download_url'] ?? '').toString().trim();
+    final sourceUrl = (item['source_url'] ?? '').toString().trim();
+    if (pdfUrl.isEmpty) {
+      if (sourceUrl.isEmpty) {
+        _message('النسخة الرقمية غير متوفرة حاليًا لهذا الكتاب.');
+      } else {
+        final ok = await launchUrl(Uri.parse(sourceUrl), mode: LaunchMode.externalApplication);
+        if (!ok && mounted) _message('تعذر فتح مصدر الكتاب.');
+      }
+      return;
+    }
+    final id = (item['id'] ?? item['title'] ?? 'reference').toString();
     final temp = File(file.path + '.part');
+    final existing = await temp.exists() ? await temp.length() : 0;
+    final token = CancelToken();
+    _tokens[id] = token;
     setState(() => _progress[id] = 0);
     try {
-      await _dio.download(pdfUrl, temp.path, deleteOnError: true,
-        options: Options(followRedirects: true, maxRedirects: 5),
+      final response = await _dio.get<List<int>>(
+        pdfUrl,
+        cancelToken: token,
+        options: Options(
+          responseType: ResponseType.bytes,
+          followRedirects: true,
+          maxRedirects: 5,
+          headers: existing > 0 ? {'Range': 'bytes=' + existing.toString() + '-'} : null,
+        ),
         onReceiveProgress: (received, total) {
-          if (mounted && total > 0) setState(() => _progress[id] = received / total);
-        });
-      if (!await temp.exists()) throw const FileSystemException('download_failed');
+          final base = existing > 0 ? existing : 0;
+          final full = total > 0 ? base + total : 0;
+          if (mounted && full > 0) setState(() => _progress[id] = (base + received) / full);
+        },
+      );
+      final status = response.statusCode ?? 0;
+      final bytes = response.data ?? const <int>[];
+      if (existing > 0 && status == 206) {
+        await temp.writeAsBytes(bytes, mode: FileMode.append, flush: true);
+      } else {
+        await temp.writeAsBytes(bytes, flush: true);
+      }
+      if (status != 200 && status != 206) throw const HttpException('download_status');
+      final range = response.headers.value('content-range') ?? '';
+      final totalText = range.contains('/') ? range.split('/').last : '';
+      final expected = int.tryParse(totalText) ?? 0;
+      if (expected > 0 && await temp.length() < expected) {
+        throw const HttpException('partial_download');
+      }
       if (await file.exists()) await file.delete();
       await temp.rename(file.path);
-      if (mounted) setState(() { _progress.remove(id); _downloaded.add(_fileName(item)); });
+      _tokens.remove(id);
+      setState(() {
+        _progress.remove(id);
+        _downloaded.add(_fileName(item));
+        _reading.add(id);
+      });
+      await _saveFlags();
       _openPdf(file.path, (item['title'] ?? 'الكتاب').toString());
+    } on DioException catch (e) {
+      _tokens.remove(id);
+      setState(() => _progress.remove(id));
+      if (CancelToken.isCancel(e)) {
+        _message('تم إيقاف التنزيل مؤقتًا. الملف الجزئي محفوظ ويمكن استئنافه.');
+      } else {
+        _message('توقف التنزيل بسبب الاتصال. الملف الجزئي محفوظ ويمكن استئنافه.');
+      }
     } catch (_) {
-      if (await temp.exists()) await temp.delete();
-      if (mounted) setState(() => _progress.remove(id));
-      _message('تعذر تنزيل الكتاب من المصدر حاليًا.');
+      _tokens.remove(id);
+      setState(() => _progress.remove(id));
+      _message('تعذر إكمال التنزيل. الملف الجزئي محفوظ للاستئناف.');
     }
+  }
+
+  Future<void> _pause(Map<String, dynamic> item) async {
+    final id = (item['id'] ?? item['title'] ?? 'reference').toString();
+    _tokens[id]?.cancel('paused_by_user');
+    _tokens.remove(id);
+    if (mounted) setState(() => _progress.remove(id));
   }
 
   void _openPdf(String path, String title) {
