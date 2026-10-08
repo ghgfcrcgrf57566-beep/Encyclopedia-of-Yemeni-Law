@@ -312,11 +312,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   void _openPdf(String path, String title) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => Scaffold(
-      backgroundColor: const Color(0xFF120D09),
-      appBar: AppBar(title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis), backgroundColor: const Color(0xFF2A1A10)),
-      body: PDFView(filePath: path),
-    )));
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => _PdfReaderScreen(path: path, title: title),
+    ));
   }
 
   void _message(String text) => ScaffoldMessenger.of(context).showSnackBar(
@@ -880,6 +878,195 @@ class _DetailRow {
   final String label;
   final String value;
   const _DetailRow(this.label, this.value);
+}
+
+class _PdfReaderScreen extends StatefulWidget {
+  final String path;
+  final String title;
+  const _PdfReaderScreen({required this.path, required this.title});
+
+  @override
+  State<_PdfReaderScreen> createState() => _PdfReaderScreenState();
+}
+
+class _PdfReaderScreenState extends State<_PdfReaderScreen> {
+  PDFViewController? _controller;
+  SharedPreferences? _prefs;
+  int _page = 0;
+  int _pages = 0;
+  Set<int> _bookmarks = {};
+
+  String get _key {
+    final name = widget.path.split('/').last.replaceAll('.pdf', '');
+    return 'library_reader_' + name;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReaderState();
+  }
+
+  Future<void> _loadReaderState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final page = prefs.getInt(_key + '_page') ?? 0;
+    final marks = prefs.getStringList(_key + '_bookmarks') ?? [];
+    if (!mounted) return;
+    setState(() {
+      _prefs = prefs;
+      _page = page;
+      _bookmarks = marks.map(int.tryParse).whereType<int>().toSet();
+    });
+  }
+
+  Future<void> _savePage(int page) async {
+    _page = page;
+    await _prefs?.setInt(_key + '_page', page);
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _toggleBookmark() async {
+    if (_bookmarks.contains(_page)) {
+      _bookmarks.remove(_page);
+    } else {
+      _bookmarks.add(_page);
+    }
+    await _prefs?.setStringList(_key + '_bookmarks', _bookmarks.map((e) => e.toString()).toList());
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _jumpToPage() async {
+    if (_pages <= 0 || _controller == null) return;
+    final controller = TextEditingController(text: (_page + 1).toString());
+    final value = await showDialog<int>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: const Color(0xFF21150D),
+        title: const Text('الانتقال إلى صفحة', textAlign: TextAlign.right),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          textDirection: TextDirection.rtl,
+          decoration: InputDecoration(hintText: 'من 1 إلى ' + _pages.toString()),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+          FilledButton(
+            onPressed: () {
+              final p = int.tryParse(controller.text.trim());
+              if (p == null || p < 1 || p > _pages) return;
+              Navigator.pop(context, p);
+            },
+            child: const Text('انتقال'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (value != null) await _controller?.setPage(value - 1);
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Colors.black,
+    appBar: AppBar(
+      backgroundColor: const Color(0xFF21150D),
+      title: Text(widget.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      actions: [
+        IconButton(
+          tooltip: 'الانتقال إلى صفحة',
+          onPressed: _jumpToPage,
+          icon: const Icon(Icons.input_rounded, color: Color(0xFFD4AF37)),
+        ),
+        IconButton(
+          tooltip: _bookmarks.contains(_page) ? 'إزالة العلامة' : 'حفظ العلامة',
+          onPressed: _toggleBookmark,
+          icon: Icon(
+            _bookmarks.contains(_page) ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+            color: const Color(0xFFD4AF37),
+          ),
+        ),
+        PopupMenuButton<int>(
+          tooltip: 'العلامات المحفوظة',
+          icon: const Icon(Icons.bookmarks_rounded, color: Color(0xFFD4AF37)),
+          onSelected: (p) => _controller?.setPage(p),
+          itemBuilder: (_) {
+            final marks = _bookmarks.toList()..sort();
+            if (marks.isEmpty) {
+              return const [PopupMenuItem(enabled: false, value: -1, child: Text('لا توجد علامات محفوظة'))];
+            }
+            return marks.map((p) => PopupMenuItem(value: p, child: Text('صفحة ' + (p + 1).toString()))).toList();
+          },
+        ),
+      ],
+    ),
+    body: Stack(
+      children: [
+        PDFView(
+          filePath: widget.path,
+          defaultPage: _page,
+          enableSwipe: true,
+          swipeHorizontal: false,
+          autoSpacing: true,
+          pageFling: true,
+          pageSnap: true,
+          showScrollIndicators: true,
+          fitPolicy: FitPolicy.BOTH,
+          backgroundColor: Colors.black,
+          onViewCreated: (controller) async {
+            _controller = controller;
+            final count = await controller.getPageCount();
+            if (!mounted) return;
+            setState(() => _pages = count);
+            if (_page < count) await controller.setPage(_page);
+          },
+          onRender: (pages) {
+            if (mounted && pages != null) setState(() => _pages = pages);
+          },
+          onPageChanged: (page, total) {
+            if (page == null) return;
+            _savePage(page);
+            if (total != null && mounted) setState(() => _pages = total);
+          },
+          onError: (_) {},
+          onPageError: (_, __) {},
+        ),
+        if (_pages > 1)
+          Positioned(
+            left: 8,
+            right: 8,
+            bottom: 8,
+            child: Material(
+              color: Colors.black87,
+              borderRadius: BorderRadius.circular(16),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: _page > 0 ? () => _controller?.setPage(_page - 1) : null,
+                    icon: const Icon(Icons.chevron_left_rounded, color: Color(0xFFD4AF37)),
+                  ),
+                  Expanded(
+                    child: Slider(
+                      value: _page.clamp(0, _pages - 1).toDouble(),
+                      min: 0,
+                      max: (_pages - 1).toDouble(),
+                      divisions: _pages - 1,
+                      activeColor: const Color(0xFFD4AF37),
+                      onChanged: (value) => _controller?.setPage(value.round()),
+                    ),
+                  ),
+                  Text((_page + 1).toString() + '/' + _pages.toString(), style: const TextStyle(color: Colors.white)),
+                  IconButton(
+                    onPressed: _page < _pages - 1 ? () => _controller?.setPage(_page + 1) : null,
+                    icon: const Icon(Icons.chevron_right_rounded, color: Color(0xFFD4AF37)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
 }
 
 class _LibraryCategory {
