@@ -101,6 +101,32 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   bool _isSharia(Map<String, dynamic> item) {
+    final section = (item['section'] ?? '').toString().trim().toLowerCase();
+    final category = (item['category'] ?? '').toString().trim().toLowerCase();
+
+    // الفهرس الصريح هو المرجع الأول؛ التحليل النصي مجرد احتياط للسجلات القديمة.
+    if (section == 'sharia' || section.contains('مراجع شرعية')) return true;
+    if (section == 'legal' ||
+        section.contains('مراجع قانونية') ||
+        section.contains('شروح وموسوعات') ||
+        section.contains('دراسات مقارنة') ||
+        section.contains('دراسات وأبحاث')) {
+      return false;
+    }
+    if (category.contains('فقه') ||
+        category.contains('حديث') ||
+        category.contains('أصول') ||
+        category.contains('فتاوى') ||
+        category.contains('زيد') ||
+        category.contains('شافعي') ||
+        category.contains('حنفي') ||
+        category.contains('مالكي') ||
+        category.contains('حنبلي') ||
+        category.contains('إمامي') ||
+        category.contains('شرعي')) {
+      return true;
+    }
+
     final text = _text(item);
     const terms = [
       'فقه','شرعي','الشريعة','إسلام','الإسلام','المذاهب','مذهب','حديث','أصول الفقه',
@@ -117,6 +143,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   String _legalCategory(Map<String, dynamic> item) {
+    final explicit = (item['category'] ?? '').toString().trim();
+    const known = _legalCategories;
+    for (final category in known) {
+      if (explicit == category.title) return category.title;
+    }
     final text = _text(item);
     if (_isSanhouri(item) || text.contains('شرح') || text.contains('موسوعة') || text.contains('حاشية')) return 'الشروح والموسوعات';
     if (text.contains('قاموس') || text.contains('معجم') || text.contains('مصطلحات القانون')) return 'المعاجم والمداخل القانونية';
@@ -134,6 +165,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   String _shariaCategory(Map<String, dynamic> item) {
+    final explicit = (item['category'] ?? '').toString().trim();
+    const known = _shariaCategories;
+    for (final category in known) {
+      if (explicit == category.title) return category.title;
+    }
     final text = _text(item);
     if (text.contains('زيد') || text.contains('الزيدية')) return 'الفقه الزيدي';
     if (text.contains('شافعي')) return 'الفقه الشافعي';
