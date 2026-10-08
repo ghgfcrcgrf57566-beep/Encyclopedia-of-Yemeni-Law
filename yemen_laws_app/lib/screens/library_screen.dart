@@ -1134,7 +1134,7 @@ class _PdfReaderScreenState extends State<_PdfReaderScreen> {
           backgroundColor: Colors.black,
           onViewCreated: (controller) async {
             _controller = controller;
-            final count = await controller.getPageCount();
+            final count = await controller.getPageCount() ?? 0;
             if (!mounted) return;
             setState(() => _pages = count);
             if (_page < count) await controller.setPage(_page);
@@ -1272,8 +1272,8 @@ class _CollectionCard extends StatelessWidget {
 }
 
 class _BookCard extends StatelessWidget {
-  final Map<String, dynamic> item; final Set<String> downloaded; final Map<String, double> progress;
-  final Future<void> Function(Map<String, dynamic>) onDownload; final void Function(Map<String, dynamic>) onInfo;
+  final Map<String, dynamic> item; final bool downloaded; final Map<String, double> progress;
+  final Future<void> Function(Map<String, dynamic>) onDownload; final Future<void> Function(Map<String, dynamic>) onPause; final void Function(Map<String, dynamic>) onInfo;
   const _BookCard({required this.item, required this.downloaded, required this.progress, required this.onDownload, required this.onPause, required this.onInfo});
 
   String _fileName() => (item['id'] ?? 'reference').toString().replaceAll(RegExp(r'[^a-zA-Z0-9._-]+'), '_').toLowerCase() + '.pdf';
@@ -1281,7 +1281,7 @@ class _BookCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final id = (item['id'] ?? '').toString();
-    final done = downloaded.contains(_fileName());
+    final done = downloaded;
     final p = progress[id];
     final cover = (item['cover_image_url'] ?? '').toString().trim();
     return Container(
