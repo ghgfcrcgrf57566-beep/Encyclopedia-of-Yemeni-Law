@@ -14,7 +14,7 @@ import 'feedback/feedback_screen.dart';
 import 'inheritance_calculator_screen.dart';
 import 'laws/laws_home_screen.dart';
 import 'supreme_court_screen.dart';
-import 'legal_references_screen.dart';
+import 'library_screen.dart';
 import 'legal_ai/legal_ai_screen.dart';
 
 class RootShell extends StatelessWidget {
@@ -22,7 +22,7 @@ class RootShell extends StatelessWidget {
 
   List<_SectionData> _sections() => [
         _SectionData(icon: Icons.auto_awesome_rounded, title: 'اسأل موسوعة القوانين اليمنية', subtitle: 'مساعد ذكي يبحث أولاً في نصوص القوانين', builder: (_) => const LegalAiScreen(), fullWidth: true),
-        _SectionData(icon: Icons.menu_book_rounded, title: 'المراجع القانونية', subtitle: 'كتب وشروحات وأبحاث قانونية', builder: (_) => const LegalReferencesScreen()),
+        _SectionData(icon: Icons.menu_book_rounded, title: 'المكتبة', subtitle: 'المكتبة القانونية والمكتبة الشرعية', builder: (_) => const LibraryScreen()),
         _SectionData(icon: Icons.balance_rounded, title: 'القوانين اليمنية', subtitle: 'نصوص القوانين والمواد', builder: (_) => const LawsHomeScreen()),
         _SectionData(icon: Icons.description_rounded, title: 'المذكرات والنماذج القانونية', subtitle: 'صحائف وعقود وإنذارات ونماذج', builder: (_) => const ComingSoonScreen(title: 'المذكرات والنماذج القانونية')),
         _SectionData(icon: Icons.account_balance_rounded, title: 'أحكام المحكمة العليا', subtitle: 'القواعد والمبادئ والأحكام القضائية', builder: (_) => const SupremeCourtScreen()),
