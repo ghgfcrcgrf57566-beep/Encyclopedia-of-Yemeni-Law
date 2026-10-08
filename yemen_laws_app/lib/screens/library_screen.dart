@@ -1272,39 +1272,154 @@ class _CollectionCard extends StatelessWidget {
 }
 
 class _BookCard extends StatelessWidget {
-  final Map<String, dynamic> item; final bool downloaded; final Map<String, double> progress;
-  final Future<void> Function(Map<String, dynamic>) onDownload; final Future<void> Function(Map<String, dynamic>) onPause; final void Function(Map<String, dynamic>) onInfo;
-  const _BookCard({required this.item, required this.downloaded, required this.progress, required this.onDownload, required this.onPause, required this.onInfo});
+  final Map<String, dynamic> item;
+  final bool downloaded;
+  final Map<String, double> progress;
+  final Future<void> Function(Map<String, dynamic>) onDownload;
+  final Future<void> Function(Map<String, dynamic>) onPause;
+  final void Function(Map<String, dynamic>) onInfo;
 
-  String _fileName() => (item['id'] ?? 'reference').toString().replaceAll(RegExp(r'[^a-zA-Z0-9._-]+'), '_').toLowerCase() + '.pdf';
+  const _BookCard({
+    required this.item,
+    required this.downloaded,
+    required this.progress,
+    required this.onDownload,
+    required this.onPause,
+    required this.onInfo,
+  });
 
   @override
   Widget build(BuildContext context) {
     final id = (item['id'] ?? '').toString();
-    final done = downloaded;
     final p = progress[id];
-    final cover = (item['cover_image_url'] ?? '').toString().trim();
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: const Color(0xB31F140D), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0x66D4AF37))),
-      child: Row(textDirection: TextDirection.rtl, children: [
-        SizedBox(width: 70, height: 94, child: cover.isEmpty ? const Icon(Icons.menu_book_rounded, size: 44, color: Color(0xFFD4AF37)) : ClipRRect(borderRadius: BorderRadius.circular(10), child: CachedNetworkImage(imageUrl: cover, fit: BoxFit.cover, errorWidget: (_, __, ___) => const Icon(Icons.menu_book_rounded, size: 44, color: Color(0xFFD4AF37))))),
-        const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Text((item['title'] ?? 'كتاب').toString(), textAlign: TextAlign.right, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, height: 1.35)),
-          if ((item['author'] ?? '').toString().trim().isNotEmpty) ...[
-            const SizedBox(height: 5), Text(item['author'].toString(), textAlign: TextAlign.right, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFFE5BE72), fontSize: 12)),
+    final cover = (item['cover_image_url'] ?? item['cover_url'] ?? '').toString().trim();
+    final title = (item['title'] ?? 'كتاب').toString();
+    final author = (item['author'] ?? '').toString().trim();
+
+    Widget coverWidget() {
+      if (cover.isEmpty) {
+        return Container(
+          color: const Color(0xFF21150D),
+          child: const Icon(Icons.menu_book_rounded, size: 42, color: Color(0xFFD4AF37)),
+        );
+      }
+      return CachedNetworkImage(
+        imageUrl: cover,
+        fit: BoxFit.cover,
+        placeholder: (_, __) => const Center(
+          child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFD4AF37)),
+        ),
+        errorWidget: (_, __, ___) => const Center(
+          child: Icon(Icons.menu_book_rounded, size: 42, color: Color(0xFFD4AF37)),
+        ),
+      );
+    }
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: () => onInfo(item),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        child: Row(
+          textDirection: TextDirection.rtl,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 88,
+              height: 118,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: coverWidget(),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    title,
+                    textAlign: TextAlign.right,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      height: 1.35,
+                    ),
+                  ),
+                  if (author.isNotEmpty) ...[
+                    const SizedBox(height: 7),
+                    Text(
+                      author,
+                      textAlign: TextAlign.right,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 15,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                  if (p != null) ...[
+                    const SizedBox(height: 8),
+                    LinearProgressIndicator(
+                      value: p,
+                      minHeight: 3,
+                      backgroundColor: Colors.white12,
+                      color: const Color(0xFFD4AF37),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            SizedBox(
+              width: 54,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    tooltip: 'معلومات الكتاب',
+                    onPressed: () => onInfo(item),
+                    icon: const Icon(
+                      Icons.info_rounded,
+                      color: Color(0xFF8D99AE),
+                      size: 34,
+                    ),
+                  ),
+                  if (p != null)
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      tooltip: 'إيقاف التنزيل',
+                      onPressed: () => onPause(item),
+                      icon: const Icon(
+                        Icons.pause_rounded,
+                        color: Color(0xFFD4AF37),
+                        size: 34,
+                      ),
+                    )
+                  else
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      tooltip: downloaded ? 'فتح الكتاب' : 'تحميل الكتاب',
+                      onPressed: () => onDownload(item),
+                      icon: Icon(
+                        downloaded ? Icons.menu_book_rounded : Icons.download_rounded,
+                        color: const Color(0xFFD4AF37),
+                        size: 36,
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ],
-          const SizedBox(height: 8),
-          Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-            IconButton(tooltip: 'معلومات الكتاب', onPressed: () => onInfo(item), icon: const Icon(Icons.info_outline_rounded, color: Color(0xFFD4AF37))),
-            if (p != null) ...[
-              SizedBox(width: 32, height: 32, child: CircularProgressIndicator(value: p, color: const Color(0xFFD4AF37), strokeWidth: 3)),
-              IconButton(tooltip: 'إيقاف مؤقت', onPressed: () => onPause(item), icon: const Icon(Icons.pause_rounded, color: Colors.white70)),
-            ] else IconButton(tooltip: done ? 'فتح الكتاب' : 'تنزيل الكتاب', onPressed: () => onDownload(item), icon: Icon(done ? Icons.menu_book_rounded : Icons.download_rounded, color: const Color(0xFFD4AF37))),
-          ]),
-        ])),
-      ]),
+        ),
+      ),
     );
   }
 }
