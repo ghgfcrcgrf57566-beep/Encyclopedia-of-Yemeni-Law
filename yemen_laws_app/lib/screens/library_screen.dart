@@ -671,6 +671,217 @@ class _BookListScreenState extends State<_BookListScreen> {
   }
 }
 
+class _BookDetailsScreen extends StatelessWidget {
+  final Map<String, dynamic> item;
+  final bool favorite;
+  final bool downloaded;
+  final double? progress;
+  final VoidCallback onFavorite;
+  final VoidCallback onDownload;
+  final VoidCallback onDelete;
+  final VoidCallback onOpen;
+
+  const _BookDetailsScreen({
+    required this.item,
+    required this.favorite,
+    required this.downloaded,
+    required this.progress,
+    required this.onFavorite,
+    required this.onDownload,
+    required this.onDelete,
+    required this.onOpen,
+  });
+
+  String _value(String key) {
+    final v = (item[key] ?? '').toString().trim();
+    return v.isEmpty ? 'غير متوفر' : v;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cover = (item['cover_url'] ?? item['cover_image_url'] ?? '').toString().trim();
+    final pdf = (item['pdf_url'] ?? item['download_url'] ?? '').toString().trim();
+    final summary = (item['full_summary'] ?? item['description'] ?? '').toString().trim();
+    return Scaffold(
+      backgroundColor: const Color(0xFF120D09),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF21150D),
+        centerTitle: true,
+        title: Text((item['title'] ?? 'تفاصيل الكتاب').toString(), maxLines: 1, overflow: TextOverflow.ellipsis),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(14),
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            textDirection: TextDirection.rtl,
+            children: [
+              _DetailCover(url: cover),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text((item['title'] ?? 'كتاب').toString(), textAlign: TextAlign.right, style: const TextStyle(color: Color(0xFFE5BE72), fontSize: 20, fontWeight: FontWeight.w900, height: 1.4)),
+                    const SizedBox(height: 10),
+                    Text('المؤلف: ' + _value('author'), textAlign: TextAlign.right, style: const TextStyle(color: Colors.white70)),
+                    const SizedBox(height: 6),
+                    Text('التصنيف: ' + _value('category'), textAlign: TextAlign.right, style: const TextStyle(color: Colors.white70)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                onPressed: onFavorite,
+                icon: Icon(favorite ? Icons.star_rounded : Icons.star_border_rounded, color: const Color(0xFFD4AF37)),
+                label: const Text('المفضلة'),
+              ),
+              if (downloaded)
+                OutlinedButton.icon(
+                  onPressed: onOpen,
+                  icon: const Icon(Icons.menu_book_rounded, color: Color(0xFFD4AF37)),
+                  label: const Text('قراءة'),
+                )
+              else if (pdf.isNotEmpty)
+                OutlinedButton.icon(
+                  onPressed: onDownload,
+                  icon: const Icon(Icons.download_rounded, color: Color(0xFFD4AF37)),
+                  label: const Text('تنزيل'),
+                ),
+              if (downloaded)
+                OutlinedButton.icon(
+                  onPressed: onDelete,
+                  icon: const Icon(Icons.delete_outline_rounded, color: Colors.white54),
+                  label: const Text('حذف النسخة'),
+                ),
+            ],
+          ),
+          if (progress != null) ...[
+            const SizedBox(height: 12),
+            LinearProgressIndicator(value: progress, color: const Color(0xFFD4AF37), backgroundColor: Colors.white12),
+            const SizedBox(height: 5),
+            Text((progress! * 100).round().toString() + '%', textAlign: TextAlign.right, style: const TextStyle(color: Color(0xFFE5BE72))),
+          ],
+          const SizedBox(height: 18),
+          _DetailSection('بيانات الكتاب', [
+            _DetailRow('العنوان', _value('title')),
+            _DetailRow('المؤلف', _value('author')),
+            _DetailRow('سنة الوفاة', _value('author_death_year')),
+            _DetailRow('الناشر', _value('publisher')),
+            _DetailRow('الطبعة', _value('edition')),
+            _DetailRow('عدد الصفحات', _value('pages_count')),
+            _DetailRow('مطابقة المطبوع', _value('print_matching')),
+            _DetailRow('الحجم', _value('file_size')),
+            _DetailRow('تاريخ الإضافة', _value('date_added')),
+          ]),
+          if (summary.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            _DetailSection('نبذة', [_DetailRow('', summary)]),
+          ],
+          const SizedBox(height: 14),
+          _DetailSection('حالة النسخة', [
+            _DetailRow('', downloaded
+                ? 'النسخة محفوظة داخل التطبيق ويمكن قراءتها دون إعادة التنزيل.'
+                : pdf.isNotEmpty
+                    ? 'تتوفر نسخة PDF للتنزيل.'
+                    : 'النسخة الرقمية غير متوفرة حاليًا؛ بقيت بيانات الكتاب في الفهرس.'),
+          ]),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailCover extends StatelessWidget {
+  final String url;
+  const _DetailCover({required this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    if (url.isEmpty) {
+      return Container(
+        width: 130,
+        height: 180,
+        decoration: BoxDecoration(
+          color: const Color(0xFF2A1A10),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0x66D4AF37)),
+        ),
+        child: const Icon(Icons.menu_book_rounded, size: 52, color: Color(0xFFD4AF37)),
+      );
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: CachedNetworkImage(
+        imageUrl: url,
+        width: 130,
+        height: 180,
+        fit: BoxFit.cover,
+        fadeInDuration: const Duration(milliseconds: 250),
+        placeholder: (_, __) => const SizedBox(
+          width: 130,
+          height: 180,
+          child: Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37))),
+        ),
+        errorWidget: (_, __, ___) => const SizedBox(
+          width: 130,
+          height: 180,
+          child: Center(child: Icon(Icons.menu_book_rounded, size: 52, color: Color(0xFFD4AF37))),
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailSection extends StatelessWidget {
+  final String title;
+  final List<_DetailRow> rows;
+  const _DetailSection(this.title, this.rows);
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: const Color(0xB31F140D),
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: const Color(0x44D4AF37)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(title, textAlign: TextAlign.right, style: const TextStyle(color: Color(0xFFE5BE72), fontWeight: FontWeight.w900, fontSize: 17)),
+        const SizedBox(height: 8),
+        ...rows.map((row) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 5),
+          child: Row(
+            textDirection: TextDirection.rtl,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (row.label.isNotEmpty)
+                SizedBox(width: 105, child: Text(row.label, textAlign: TextAlign.right, style: const TextStyle(color: Color(0xFFE5BE72), fontWeight: FontWeight.bold, fontSize: 12))),
+              if (row.label.isNotEmpty) const SizedBox(width: 8),
+              Expanded(child: Text(row.value, textAlign: TextAlign.right, style: const TextStyle(color: Colors.white70, height: 1.45))),
+            ],
+          ),
+        )),
+      ],
+    ),
+  );
+}
+
+class _DetailRow {
+  final String label;
+  final String value;
+  const _DetailRow(this.label, this.value);
+}
+
 class _LibraryCategory {
   final String title;
   final IconData icon;
