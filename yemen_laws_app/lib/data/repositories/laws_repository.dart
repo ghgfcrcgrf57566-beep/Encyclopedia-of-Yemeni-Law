@@ -138,12 +138,12 @@ class LawsRepository {
     }
   }
 
-  Future<List<Madda>> searchForLegalAssistant(String query, {int limit = 8}) async {
+  Future<List<Madda>> searchForLegalAssistant(String query, {int? lawId, int limit = 8}) async {
     final trimmed = query.trim();
     if (trimmed.isEmpty) return [];
     final numeric = int.tryParse(trimmed);
     if (numeric != null) return getMaddaByNumber(trimmed);
-    final direct = await search(trimmed, limit: limit);
+    final direct = await search(trimmed, lawId: lawId, limit: limit);
     if (direct.isNotEmpty) return direct;
     final terms = trimmed.split(RegExp(r'\s+')).map(_normalizeAssistantTerm).where((term) => term.length >= 2 && !_assistantStopWords.contains(term)).take(8).toList();
     if (terms.isEmpty) return [];
@@ -154,15 +154,15 @@ class LawsRepository {
         SELECT m.*, l.name AS law_name, b.label AS bab_label, f.label AS fasl_label
         FROM mawad_fts fts JOIN mawad m ON m.id = fts.rowid JOIN laws l ON l.id = m.law_id
         LEFT JOIN abwab b ON b.id = m.bab_id LEFT JOIN fusul f ON f.id = m.fasl_id
-        WHERE mawad_fts MATCH ? ORDER BY rank LIMIT ?
-      ''', [ftsQuery, limit]);
+        WHERE mawad_fts MATCH ? ${lawId != null ? 'AND m.law_id = ?' : ''} ORDER BY rank LIMIT ?
+      ''', lawId != null ? [ftsQuery, lawId, limit] : [ftsQuery, limit]);
       final result = rows.map(Madda.fromMap).toList();
       if (result.isNotEmpty) return result;
     } catch (_) {}
     final clauses = terms.map((_) => '(m.body LIKE ? OR m.number LIKE ? OR l.name LIKE ?)').join(' OR ');
     final args = <String>[];
     for (final term in terms) { args..add('%$term%')..add('%$term%')..add('%$term%'); }
-    final rows = await db.rawQuery('SELECT m.*, l.name AS law_name, b.label AS bab_label, f.label AS fasl_label FROM mawad m JOIN laws l ON l.id = m.law_id LEFT JOIN abwab b ON b.id = m.bab_id LEFT JOIN fusul f ON f.id = m.fasl_id WHERE $clauses ORDER BY l.order_num, m.order_num LIMIT ?', [...args, limit]);
+    final rows = await db.rawQuery('SELECT m.*, l.name AS law_name, b.label AS bab_label, f.label AS fasl_label FROM mawad m JOIN laws l ON l.id = m.law_id LEFT JOIN abwab b ON b.id = m.bab_id LEFT JOIN fusul f ON f.id = m.fasl_id WHERE ($clauses) ${lawId != null ? 'AND m.law_id = ?' : ''} ORDER BY l.order_num, m.order_num LIMIT ?', [...args, if (lawId != null) lawId, limit]);
     return rows.map(Madda.fromMap).toList();
   }
 
