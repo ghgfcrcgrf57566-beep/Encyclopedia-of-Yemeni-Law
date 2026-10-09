@@ -1,0 +1,128 @@
+name: Import Legal Database to D1 and Reindex
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/import-legal-db.yml"
+      - "backend/legal-ai/schema.sql"
+      - "yemen_laws_app/tools/export_rag_data.py"
+      - "yemen_laws_app/assets/db/app_database.db"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: legal-db-import
+  cancel-in-progress: false
+
+jobs:
+  import-and-index:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      REINDEX_TOKEN: ${{ secrets.REINDEX_TOKEN }}
+      LEGAL_AI_BASE_URL: https://odd-mouse-c1e0.ghgfcrcgrf57566.workers.dev
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate required secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_API_TOKEN REINDEX_TOKEN; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Missing GitHub Actions secret: $name"
+              exit 1
+            fi
+          done
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Wrangler
+        run: npm install --global wrangler@4
+
+      - name: Authenticate with Cloudflare
+        run: wrangler whoami
+
+      - name: Apply D1 schema
+        run: wrangler d1 execute yemen_laws_db --remote --config backend/legal-ai/wrangler.jsonc --file backend/legal-ai/schema.sql
+
+      - name: Export canonical SQLite corpus
+        run: python yemen_laws_app/tools/export_rag_data.py --db yemen_laws_app/assets/db/app_database.db --out artifacts/legal-rag-export
+
+      - name: Verify exported row counts
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path("artifacts/legal-rag-export")
+          expected={"laws":15,"abwab":245,"fusul":398,"mawad":4974}
+          for table, count in expected.items():
+              rows=json.loads((root/f"{table}.json").read_text(encoding="utf-8"))
+              print(f"{table}: {len(rows)} rows")
+              if len(rows) != count:
+                  raise SystemExit(f"{table} count mismatch: expected {count}, got {len(rows)}")
+          PY
+
+      - name: Import legal data into remote D1
+        run: wrangler d1 execute yemen_laws_db --remote --config backend/legal-ai/wrangler.jsonc --file artifacts/legal-rag-export/seed.sql
+
+      - name: Verify D1 data counts
+        shell: bash
+        run: |
+          set -euo pipefail
+          for table in laws abwab fusul mawad; do
+            echo "Checking $table"
+            wrangler d1 execute yemen_laws_db --remote --config backend/legal-ai/wrangler.jsonc --command "SELECT COUNT(*) AS count FROM $table;"
+          done
+
+      - name: Reindex legal articles in Vectorize
+        shell: bash
+        run: |
+          set -euo pipefail
+          after=0
+          while true; do
+            echo "Reindexing after id=$after"
+            response="$(curl --fail --silent --show-error --location --max-time 180 \
+              -X POST "$LEGAL_AI_BASE_URL/admin/reindex?after=$after&limit=40" \
+              -H "Authorization: Bearer $REINDEX_TOKEN" \
+              -H 'Accept: application/json')"
+            printf '%s\n' "$response"
+            read -r done next_after processed < <(python -c 'import json,sys; p=json.loads(sys.argv[1]); print(str(bool(p.get("done"))).lower(), int(p.get("next_after",0)), int(p.get("processed",0)))' "$response")
+            if [[ "$processed" -eq 0 || "$done" == "true" ]]; then
+              echo "Reindex endpoint reports completion."
+              break
+            fi
+            if [[ "$next_after" -le "$after" ]]; then
+              echo "::error::Reindex cursor did not advance."
+              exit 1
+            fi
+            after="$next_after"
+          done
+
+      - name: Verify health endpoint
+        run: curl --fail --silent --show-error --location --max-time 30 "$LEGAL_AI_BASE_URL/health"
+
+      - name: Upload import report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: legal-db-import-report
+          path: artifacts/legal-rag-export/*.json
+          if-no-files-found: ignore
+          retention-days: 7
