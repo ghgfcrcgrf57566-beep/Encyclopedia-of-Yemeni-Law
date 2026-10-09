@@ -239,8 +239,11 @@ class LegalAiService {
         conversationId: (payload['conversation_id'] ?? conversationId)?.toString(),
         responseSource: (payload['response_source'] ?? 'cloudflare_legal_rag').toString(),
       );
+    } on LegalAiException {
+      rethrow;
     } catch (_) {
-      // Network/service errors must not disable the existing local search path.
+      // Network errors may use the local-only fallback; never call Gemini
+      // directly from the APK when no client API key is configured.
       return null;
     }
   }
