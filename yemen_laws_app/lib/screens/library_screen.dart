@@ -24,7 +24,6 @@ const _legalCategories = <_LibraryCategory>[
   _LibraryCategory('العقارات والإيجارات', Icons.home_work_rounded),
   _LibraryCategory('الإجراءات والإثبات والتحكيم', Icons.fact_check_rounded),
   _LibraryCategory('القوانين المهنية والصحية', Icons.medical_services_rounded),
-  _LibraryCategory('الدراسات والأبحاث', Icons.science_rounded),
   _LibraryCategory('المعاجم والمداخل القانونية', Icons.menu_book_rounded),
 ];
 
@@ -42,7 +41,6 @@ const _shariaCategories = <_LibraryCategory>[
   _LibraryCategory('الشروح والحواشي', Icons.library_books_rounded),
   _LibraryCategory('الفتاوى', Icons.question_answer_rounded),
   _LibraryCategory('فقه المعاملات', Icons.handshake_rounded),
-  _LibraryCategory('التراث الإسلامي', Icons.history_edu_rounded),
 ];
 
 class LibraryScreen extends StatefulWidget {
@@ -52,7 +50,7 @@ class LibraryScreen extends StatefulWidget {
 }
 
 class _LibraryScreenState extends State<LibraryScreen> {
-  static const _cacheKey = 'cached_legal_references_json_v13';
+  static const _cacheKey = 'cached_legal_references_json_v14';
   final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 15),
     receiveTimeout: const Duration(seconds: 90),
@@ -105,14 +103,18 @@ class _LibraryScreenState extends State<LibraryScreen> {
     final category = (item['category'] ?? '').toString().trim().toLowerCase();
 
     // الفهرس الصريح هو المرجع الأول؛ التحليل النصي مجرد احتياط للسجلات القديمة.
-    if (section == 'sharia' || section.contains('مراجع شرعية')) return true;
-    if (section == 'legal' ||
-        section.contains('مراجع قانونية') ||
-        section.contains('شروح وموسوعات') ||
-        section.contains('دراسات مقارنة') ||
-        section.contains('دراسات وأبحاث')) {
-      return false;
+    // الكتب الشرعية تُوزَّع داخل موضوعاتها القانونية/المرجعية، ولا توجد فئة مستقلة باسم التراث الإسلامي.
+    if (section == 'sharia' || section.contains('مراجع شرعية')) {
+      final text = _text(item);
+      if (text.contains('أصول الفقه')) return false;
+      if (text.contains('مواريث') || text.contains('فرائض')) return false;
+      if (text.contains('معاملات') || text.contains('بيع') || text.contains('عقود')) return false;
+      if (text.contains('حديث') || text.contains('سيرة') || text.contains('تاريخ') || text.contains('تراث')) return false;
+      return true;
     }
+    if (section == 'legal' || section.contains('مراجع قانونية') ||
+        section.contains('شروح وموسوعات') || section.contains('دراسات مقارنة') ||
+        section.contains('دراسات وأبحاث')) return false;
     if (category.contains('فقه') ||
         category.contains('حديث') ||
         category.contains('أصول') ||
@@ -151,7 +153,6 @@ class _LibraryScreenState extends State<LibraryScreen> {
     final text = _text(item);
     if (_isSanhouri(item) || text.contains('شرح') || text.contains('موسوعة') || text.contains('حاشية')) return 'الشروح والموسوعات';
     if (text.contains('قاموس') || text.contains('معجم') || text.contains('مصطلحات القانون')) return 'المعاجم والمداخل القانونية';
-    if (text.contains('دراسة') || text.contains('بحث') || text.contains('أبحاث') || text.contains('دراسات')) return 'الدراسات والأبحاث';
     if (text.contains('دولي') || text.contains('مقارن') || text.contains('تنازع القوانين')) return 'القانون الدولي والمقارن';
     if (text.contains('أحوال شخصية') || text.contains('الزواج') || text.contains('الطلاق') || text.contains('الأسرة')) return 'الأحوال الشخصية';
     if (text.contains('عمل') || text.contains('عمال')) return 'قانون العمل';
@@ -184,7 +185,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
     if (text.contains('معاملات') || text.contains('بيع') || text.contains('عقود')) return 'فقه المعاملات';
     if (text.contains('شرح') || text.contains('حاشية')) return 'الشروح والحواشي';
     if (text.contains('مقارن') || text.contains('مقارنة')) return 'الفقه المقارن';
-    if (text.contains('تراث') || text.contains('تاريخ') || text.contains('سيرة')) return 'التراث الإسلامي';
+    if (text.contains('تاريخ التشريع') || text.contains('تاريخ') || text.contains('سيرة') || text.contains('تراث')) return 'الفقه المقارن';
     return 'الفقه المقارن';
   }
 
