@@ -106,9 +106,12 @@ class LegalAiService {
       final answer = await _answerFromLocalWithGemini(q, requestedScope, ranked, history);
       final review = await _reviewFinalAnswerWithGemini(q, requestedScope, answer, ranked, history);
       if (review.isMatch) {
-        await _saveHistory(q, answer, 'gemini_search_local_db');
-        return LegalAiResult(answer: answer, sources: ranked.map(LegalAiSource.fromMadda).toList(), conversationId: conversationId, responseSource: 'gemini_search_local_db');
+        await _saveHistory(q, answer, 'local_sources_explained');
+        return LegalAiResult(answer: answer, sources: ranked.map(LegalAiSource.fromMadda).toList(), conversationId: conversationId, responseSource: 'local_sources_explained');
       }
+      const retry = 'حاول مرة أخرى.';
+      await _saveHistory(q, retry, 'answer_review_failed');
+      return LegalAiResult(answer: retry, sources: const [], conversationId: conversationId, responseSource: 'answer_review_failed');
     }
 
     // إذا لم يجد Gemini نصاً مناسباً داخل قاعدة التطبيق، ينتقل إلى معرفته القانونية.
@@ -121,9 +124,9 @@ class LegalAiService {
     final generated = await _answerFromGeminiKnowledge(q, requestedScope, history);
     final generatedReview = await _reviewFinalAnswerWithGemini(q, requestedScope, generated, const [], history);
     if (!generatedReview.isMatch) {
-      const answer = 'لم أتمكن من التحقق من إجابة مرتبطة بسؤالك بدرجة كافية، لذلك لم أرسل معلومة قد تكون غير دقيقة. حدّد اسم القانون أو رقم المادة إن أمكن.';
-      await _saveHistory(q, answer, 'gemini_rejected');
-      return LegalAiResult(answer: answer, sources: const [], conversationId: conversationId, responseSource: 'gemini_rejected');
+      const answer = 'حاول مرة أخرى.';
+      await _saveHistory(q, answer, 'answer_review_failed');
+      return LegalAiResult(answer: answer, sources: const [], conversationId: conversationId, responseSource: 'answer_review_failed');
     }
 
     await _saveHistory(q, generated, 'gemini_search_knowledge');
