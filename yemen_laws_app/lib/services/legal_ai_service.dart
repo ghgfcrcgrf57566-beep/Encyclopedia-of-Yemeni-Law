@@ -151,7 +151,63 @@ class LegalAiService {
     required String? conversationId,
     required List<Map<String, String>> history,
   }) async {
-    final baseUrl = AppConfig.legalAiBaseUrl.trim().replaceFirst(RegExp(r'/+
+    var baseUrl = AppConfig.legalAiBaseUrl.trim();
+    while (baseUrl.endsWith('/')) {
+      baseUrl = baseUrl.substring(0, baseUrl.length - 1);
+    }
+    if (baseUrl.isEmpty) return null;
+
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/chat'),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-app-version': AppConfig.appVersion,
+        },
+        body: jsonEncode({
+          'message': question,
+          'conversation_id': conversationId,
+          'language': 'ar',
+          'history': history.take(8).map((item) => {
+            'role': item['role'] == 'assistant' ? 'assistant' : 'user',
+            'content': item['content'] ?? '',
+          }).toList(),
+        }),
+      ).timeout(const Duration(seconds: 55));
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return null;
+      }
+      final payload = jsonDecode(response.body);
+      if (payload is! Map<String, dynamic>) return null;
+      final answer = (payload['answer'] ?? '').toString().trim();
+      if (answer.isEmpty) return null;
+
+      final sources = <LegalAiSource>[];
+      final rawSources = payload['sources'];
+      if (rawSources is List) {
+        for (final item in rawSources) {
+          if (item is Map<String, dynamic>) {
+            sources.add(LegalAiSource.fromJson(item));
+          } else if (item is Map) {
+            sources.add(LegalAiSource.fromJson(Map<String, dynamic>.from(item)));
+          }
+        }
+      }
+
+      return LegalAiResult(
+        answer: answer,
+        sources: sources,
+        conversationId: (payload['conversation_id'] ?? conversationId)?.toString(),
+        responseSource: (payload['response_source'] ?? 'cloudflare_legal_rag').toString(),
+      );
+    } catch (_) {
+      // Network/service errors must not disable the existing local search path.
+      return null;
+    }
+  }
+
+  String _extractUserQuestion(String raw) {
     final marker = 'السؤال القانوني:';
     final index = raw.lastIndexOf(marker);
     if (index >= 0) {
