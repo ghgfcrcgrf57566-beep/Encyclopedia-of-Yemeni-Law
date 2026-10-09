@@ -64,6 +64,21 @@ class LegalAiService {
       final exact = await _lawsRepository.getMaddaByNumber(articleNumber, lawId: selectedLaw.id);
       if (exact.isNotEmpty) {
         final m = exact.first;
+        final source = [m];
+        // نستخدم النص المحلي مصدراً ملزماً، ثم نطلب شرحاً مبسطاً ومراجعته،
+        // مع منع أي مادة أو حكم غير موجود في النص المسترجع.
+        if (AppConfig.geminiApiKey.trim().isNotEmpty) {
+          try {
+            final explanation = await _answerFromLocalWithGemini(q, selectedLaw.name, source, history);
+            final review = await _reviewFinalAnswerWithGemini(q, selectedLaw.name, explanation, source, history);
+            if (review.isMatch) {
+              await _saveHistory(q, explanation, 'local_article_explained');
+              return LegalAiResult(answer: explanation, sources: [LegalAiSource.fromMadda(m)], conversationId: conversationId, responseSource: 'local_article_explained');
+            }
+          } catch (_) {
+            // عند تعذر الشرح، لا نفقد النص القانوني الأصلي الموثق.
+          }
+        }
         final answer = '${m.lawName ?? selectedLaw.name}، المادة ${m.number}:\n\n${m.body.trim()}';
         await _saveHistory(q, answer, 'local_exact_article');
         return LegalAiResult(answer: answer, sources: [LegalAiSource.fromMadda(m)], conversationId: conversationId, responseSource: 'local_exact_article');
