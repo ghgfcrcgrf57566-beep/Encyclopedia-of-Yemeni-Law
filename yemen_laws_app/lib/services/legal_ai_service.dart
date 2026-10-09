@@ -70,18 +70,22 @@ class LegalAiService {
         {
           try {
             final explanation = await _answerFromLocalWithGemini(q, selectedLaw.name, source, history);
-            final review = await _reviewFinalAnswerWithGemini(q, selectedLaw.name, explanation, source, history);
-            if (review.isMatch) {
-              await _saveHistory(q, explanation, 'local_article_explained');
-              return LegalAiResult(answer: explanation, sources: const [], conversationId: conversationId, responseSource: 'local_article_explained');
+            if (explanation.trim().isNotEmpty) {
+              await _saveHistory(q, explanation, 'cloudflare_local_article');
+              return LegalAiResult(
+                answer: explanation,
+                sources: source.map(LegalAiSource.fromMadda).toList(),
+                conversationId: conversationId,
+                responseSource: 'cloudflare_local_article',
+              );
             }
           } catch (_) {
-            // عند تعذر الشرح، لا نفقد النص القانوني الأصلي الموثق.
+            // عند تعذر الشرح السحابي، لا نفقد النص القانوني الأصلي الموثق.
           }
         }
         final answer = '${m.lawName ?? selectedLaw.name}، المادة ${m.number}:\n\n${m.body.trim()}';
         await _saveHistory(q, answer, 'local_exact_article');
-        return LegalAiResult(answer: answer, sources: const [], conversationId: conversationId, responseSource: 'local_exact_article');
+        return LegalAiResult(answer: answer, sources: source.map(LegalAiSource.fromMadda).toList(), conversationId: conversationId, responseSource: 'local_exact_article');
       }
     }
 
@@ -107,7 +111,7 @@ class LegalAiService {
       final review = await _reviewFinalAnswerWithGemini(q, requestedScope, answer, ranked, history);
       if (review.isMatch) {
         await _saveHistory(q, answer, 'local_sources_explained');
-        return LegalAiResult(answer: answer, sources: const [], conversationId: conversationId, responseSource: 'local_sources_explained');
+        return LegalAiResult(answer: answer, sources: ranked.map(LegalAiSource.fromMadda).toList(), conversationId: conversationId, responseSource: 'cloudflare_local_sources');
       }
       const retry = 'حاول مرة أخرى.';
       await _saveHistory(q, retry, 'answer_review_failed');
@@ -167,7 +171,7 @@ class LegalAiService {
   }
 
   String? _extractRequestedArticleNumber(String question) {
-    final match = RegExp(r'(?:الماده|المادة|ماده|مادة)\\s*(?:رقم\\s*)?(\\d+)').firstMatch(_normalize(question));
+    final match = RegExp(r'(?:الماده|المادة|ماده|مادة)\s*(?:رقم\s*)?(\d+)').firstMatch(_normalize(question));
     return match?.group(1);
   }
 
