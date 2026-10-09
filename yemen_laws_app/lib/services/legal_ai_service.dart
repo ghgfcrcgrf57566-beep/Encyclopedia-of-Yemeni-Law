@@ -69,7 +69,7 @@ class LegalAiService {
         // مع منع أي مادة أو حكم غير موجود في النص المسترجع.
         {
           try {
-            final explanation = await _answerFromLocalWithGemini(q, selectedLaw.name, source, history);
+            final explanation = await _answerFromLocalWithCloudflare(q, selectedLaw.name, source, history);
             if (explanation.trim().isNotEmpty) {
               await _saveHistory(q, explanation, 'cloudflare_local_article');
               return LegalAiResult(
@@ -124,8 +124,8 @@ class LegalAiService {
       } catch (_) {
         // لا نجعل تعطل الإنترنت يمنع عرض النصوص المحلية التي عثرنا عليها.
         final answer = ranked.map((m) =>
-          '${m.lawName ?? 'القوانين اليمنية'}، المادة ${m.number}:\\n${m.body.trim()}'
-        ).join('\\n\\n');
+          '${m.lawName ?? 'القوانين اليمنية'}، المادة ${m.number}:\n${m.body.trim()}'
+        ).join('\n\n');
         await _saveHistory(q, answer, 'local_sources_offline');
         return LegalAiResult(
           answer: answer,
@@ -136,8 +136,7 @@ class LegalAiService {
       }
     }
 
-    // إذا لم يجد Gemini نصاً مناسباً داخل قاعدة التطبيق، ينتقل إلى معرفته القانونية.
-    // وتبقى المراجعة النهائية إلزامية قبل الإرسال.
+    // عند عدم العثور على مادة محلية مناسبة، يواصل Worker البحث في قاعدة D1 ثم يستخدم مزود الذكاء الاصطناعي.
     final generated = await _askCloudflare(
       question: q,
       scope: requestedScope,
@@ -273,7 +272,7 @@ class LegalAiService {
         .toSet().toList();
   }
 
-  Future<String> _answerFromLocalWithGemini(String question, String scope, List<Madda> sources, List<Map<String, String>> history) async {
+  Future<String> _answerFromLocalWithCloudflare(String question, String scope, List<Madda> sources, List<Map<String, String>> history) async {
     final result = await _askCloudflare(
       question: question,
       scope: scope,
@@ -281,11 +280,6 @@ class LegalAiService {
       sources: sources,
     );
     return result.answer;
-  }
-
-  Future<_GeminiReview> _reviewFinalAnswerWithGemini(String question, String scope, String answer, List<Madda> sources, List<Map<String, String>> history) async {
-    // Final generation is delegated to Cloudflare; reject empty or obviously failed responses locally.
-    return _GeminiReview(answer.trim().isNotEmpty, answer.trim().isEmpty ? 'empty_answer' : 'cloudflare_response');
   }
 
   Future<_CloudflareResult> _askCloudflare({
@@ -377,8 +371,3 @@ class _SearchPlan {
   const _SearchPlan(this.queries);
 }
 
-class _GeminiReview {
-  final bool isMatch;
-  final String reason;
-  const _GeminiReview(this.isMatch, this.reason);
-}
