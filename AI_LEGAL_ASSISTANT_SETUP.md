@@ -33,6 +33,16 @@ flutter build apk --release \
 - `GEMINI_API_KEY`: مفتاح Google Gemini، يُضاف من إعدادات Worker > Settings > Variables and Secrets.
 - `REINDEX_TOKEN`: رمز عشوائي قوي لحماية نقطة إعادة الفهرسة.
 
+## النشر التلقائي
+
+بعد دمج هذا التغيير إلى `main`، أضف الأسرار التالية إلى GitHub Repository > Settings > Secrets and variables > Actions:
+- `CLOUDFLARE_ACCOUNT_ID`
+- `CLOUDFLARE_API_TOKEN` (صلاحيات Worker Scripts، D1، Vectorize، وWorkers AI حسب الحاجة)
+- `GEMINI_API_KEY`
+- `REINDEX_TOKEN` (رمز عشوائي قوي)
+
+اختياريًا أضف Repository Variable باسم `LEGAL_AI_BASE_URL`. بعد ذلك شغّل يدويًا GitHub Actions workflow المسمى `Deploy Cloudflare Legal AI`. يقوم workflow ببناء قاعدة القوانين المعتمدة، تطبيق مخطط D1، استيراد القوانين، نشر Worker، إعادة فهرسة المواد، ثم اختبار نقاط API. لا تشغّله قبل ضبط الأسرار.
+
 ملفات إعداد المخطط والتصدير موجودة في:
 - `backend/legal-ai/schema.sql`
 - `yemen_laws_app/tools/export_rag_data.py`
