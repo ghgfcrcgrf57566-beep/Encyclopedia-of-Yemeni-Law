@@ -101,42 +101,55 @@ class _LibraryScreenState extends State<LibraryScreen> {
   bool _isSharia(Map<String, dynamic> item) {
     final section = (item['section'] ?? '').toString().trim().toLowerCase();
     final category = (item['category'] ?? '').toString().trim().toLowerCase();
-
-    // الفهرس الصريح هو المرجع الأول؛ التحليل النصي مجرد احتياط للسجلات القديمة.
-    // الكتب الشرعية تُوزَّع داخل موضوعاتها القانونية/المرجعية، ولا توجد فئة مستقلة باسم التراث الإسلامي.
-    if (section == 'sharia' || section.contains('مراجع شرعية')) {
-      final text = _text(item);
-      if (text.contains('أصول الفقه')) return false;
-      if (text.contains('مواريث') || text.contains('فرائض')) return false;
-      if (text.contains('معاملات') || text.contains('بيع') || text.contains('عقود')) return false;
-      if (text.contains('حديث') || text.contains('سيرة') || text.contains('تاريخ') || text.contains('تراث')) return false;
-      return true;
-    }
-    if (section == 'legal' || section.contains('مراجع قانونية') ||
-        section.contains('شروح وموسوعات') || section.contains('دراسات مقارنة') ||
-        section.contains('دراسات وأبحاث')) return false;
-    if (category.contains('فقه') ||
-        category.contains('حديث') ||
-        category.contains('أصول') ||
-        category.contains('فتاوى') ||
-        category.contains('زيد') ||
-        category.contains('شافعي') ||
-        category.contains('حنفي') ||
-        category.contains('مالكي') ||
-        category.contains('حنبلي') ||
-        category.contains('إمامي') ||
-        category.contains('شرعي')) {
-      return true;
-    }
-
     final text = _text(item);
-    const terms = [
-      'فقه','شرعي','الشريعة','إسلام','الإسلام','المذاهب','مذهب','حديث','أصول الفقه',
-      'قواعد فقهية','فتاوى','الفرائض','المواريث','الحلال والحرام','التشريع الإسلامي',
-      'الشيعة','السنّة','السنة','جعفر الصادق','الفقه الإمامي','الإمامية','الزيدية',
-      'الشافعي','الحنفي','المالكي','الحنبلي','التراث الإسلامي'
+
+    // التصنيف الصريح للمكتبة الشرعية له الأولوية ولا نستثني منه الأصول
+    // أو المواريث أو الحديث أو المعاملات؛ فهذه موضوعات شرعية أصيلة.
+    if (section == 'sharia' || section.contains('مراجع شرعية')) return true;
+
+    // بعض السجلات القديمة وُسمت خطأً بأنها قانونية وفقهية؛ نعيد فحص
+    // عنوانها ووصفها قبل اعتماد القسم القانوني.
+    final mixedLegacyCategory = category.contains('مراجع قانونية وفقهية');
+    if (section == 'legal' ||
+        section.contains('مراجع قانونية') ||
+        section.contains('شروح وموسوعات') ||
+        section.contains('دراسات مقارنة') ||
+        section.contains('دراسات وأبحاث')) {
+      if (!mixedLegacyCategory) return false;
+    }
+
+    const shariaTerms = [
+      'فقه زيدي', 'الزيدية', 'فقه شافعي', 'الشافعي', 'فقه حنفي', 'الحنفي',
+      'فقه مالكي', 'المالكي', 'فقه حنبلي', 'الحنبلي', 'الفقه الإمامي',
+      'الإمامية', 'الجعفري', 'شيعي', 'أصول الفقه', 'أصول الفقة',
+      'الفرائض', 'المواريث', 'الحديث', 'فتاوى', 'الفتاوى', 'قواعد فقهية',
+      'الشريعة', 'فقه إسلامي', 'الفقه الإسلامي', 'الأحكام السلطانية',
+      'البحر الزخار', 'التاج المذهب', 'شرح الأزهار', 'الروض النضير',
+      'المحلى بالآثار', 'المغني', 'الموافقات', 'بداية المجتهد',
+      'تحفة المحتاج', 'روضة الطالبين', 'سبل السلام', 'نهاية المحتاج',
+      'مغني المحتاج', 'نيل الأوطار', 'الرسالة', 'الأم',
+      'الاعتصام بحبل الله', 'الطرق الحكمية'
     ];
-    return terms.any(text.contains);
+    if (shariaTerms.any(text.contains)) return true;
+
+    if (category.contains('فقه زيدي') ||
+        category.contains('فقه شافعي') ||
+        category.contains('فقه حنفي') ||
+        category.contains('فقه مالكي') ||
+        category.contains('فقه حنبلي') ||
+        category.contains('فقه إمامي') ||
+        category.contains('أصول الفقه') ||
+        category.contains('الفرائض') ||
+        category.contains('فتاوى') ||
+        category.contains('حديث وفقه')) return true;
+
+    if (section == 'legal' ||
+        section.contains('مراجع قانونية') ||
+        section.contains('شروح وموسوعات') ||
+        section.contains('دراسات مقارنة') ||
+        section.contains('دراسات وأبحاث')) return false;
+
+    return false;
   }
 
   bool _isSanhouri(Map<String, dynamic> item) {
@@ -189,7 +202,27 @@ class _LibraryScreenState extends State<LibraryScreen> {
     return 'الفقه المقارن';
   }
 
-  List<Map<String, dynamic>> get _libraryItems => _items.where((e) => !_isSupremeCourt(e)).toList();
+  List<Map<String, dynamic>> get _libraryItems {
+    final seenIds = <String>{};
+    final seenTitles = <String>{};
+    final unique = <Map<String, dynamic>>[];
+    for (final item in _items) {
+      if (_isSupremeCourt(item)) continue;
+      final id = (item['id'] ?? '').toString().trim();
+      final title = (item['title'] ?? '').toString().toLowerCase()
+          .replaceAll(RegExp(r'[ـًٌٍَُِّْٰ]'), '')
+          .replaceAll(RegExp(r'[أإآ]'), 'ا')
+          .replaceAll(RegExp(r'[^\\p{L}\\p{N}]+', unicode: true), ' ')
+          .trim()
+          .replaceAll(RegExp(r'\\s+'), ' ');
+      if ((id.isNotEmpty && !seenIds.add(id)) ||
+          (title.isNotEmpty && !seenTitles.add(title))) {
+        continue;
+      }
+      unique.add(item);
+    }
+    return unique;
+  }
 
   List<Map<String, dynamic>> _categoryItems(String category, bool sharia) => _libraryItems.where((item) {
     return (_isSharia(item) == sharia) &&
