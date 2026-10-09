@@ -50,18 +50,26 @@ class LegalAiService {
   }) async {
     final raw = question.trim();
     if (raw.isEmpty) throw const LegalAiException('اكتب سؤالك القانوني أولاً.');
-    if (AppConfig.geminiApiKey.trim().isEmpty) {
-      throw const LegalAiException('لا يمكن إرسال الإجابة قبل أن يبحث فيها Gemini. مفتاح Gemini غير مُعد.');
-    }
-
     // الواجهة الحالية تمرر أحياناً السؤال مع تعليمات وضع الإجابة واسم الفلتر.
     // نفصل السؤال الحقيقي والنطاق هنا حتى لا تدخل تعليمات الواجهة في بحث SQLite.
     final q = _extractUserQuestion(raw);
-    final requestedScope = lawScope == 'الكل' ? _extractLawScope(raw) : lawScope;
+    final inferredScope = _extractLawScope(raw);
+    final explicitScope = _inferLawScope(q);
+    final requestedScope = lawScope != 'الكل' ? lawScope : (inferredScope != 'الكل' ? inferredScope : (explicitScope ?? 'الكل'));
     final laws = await _lawsRepository.getAllLaws();
     final selectedLaw = await _resolveLawScope(laws, requestedScope);
 
-    // Gemini هو محرك البحث: يحدد عبارات البحث والقانون المقصود، ثم نستخدم قاعدة التطبيق كمصدر يمكنه البحث داخله.
+    final articleNumber = _extractRequestedArticleNumber(q);
+    if (articleNumber != null && selectedLaw != null) {
+      final exact = await _lawsRepository.getMaddaByNumber(articleNumber, lawId: selectedLaw.id);
+      if (exact.isNotEmpty) {
+        final m = exact.first;
+        final answer = '${m.lawName ?? selectedLaw.name}، المادة ${m.number}:\n\n${m.body.trim()}';
+        await _saveHistory(q, answer, 'local_exact_article');
+        return LegalAiResult(answer: answer, sources: [LegalAiSource.fromMadda(m)], conversationId: conversationId, responseSource: 'local_exact_article');
+      }
+    }
+
     final plan = await _planSearchWithGemini(q, requestedScope, history);
     final queries = <String>{
       ...plan.queries.where((v) => v.trim().isNotEmpty),
@@ -90,10 +98,15 @@ class LegalAiService {
 
     // إذا لم يجد Gemini نصاً مناسباً داخل قاعدة التطبيق، ينتقل إلى معرفته القانونية.
     // وتبقى المراجعة النهائية إلزامية قبل الإرسال.
+    if (AppConfig.geminiApiKey.trim().isEmpty) {
+      const answer = 'لم أعثر في قاعدة القوانين المحلية على نص مناسب بما يكفي للإجابة. جرّب تحديد اسم القانون أو صياغة السؤال بمصطلحات قانونية أدق.';
+      await _saveHistory(q, answer, 'local_no_match');
+      return LegalAiResult(answer: answer, sources: const [], conversationId: conversationId, responseSource: 'local_no_match');
+    }
     final generated = await _answerFromGeminiKnowledge(q, requestedScope, history);
     final generatedReview = await _reviewFinalAnswerWithGemini(q, requestedScope, generated, const [], history);
     if (!generatedReview.isMatch) {
-      const answer = 'لم يعتمد Gemini إجابة مرتبطة بما يكفي بسؤالك، لذلك لم يتم إرسال إجابة غير موثوقة.';
+      const answer = 'لم أتمكن من التحقق من إجابة مرتبطة بسؤالك بدرجة كافية، لذلك لم أرسل معلومة قد تكون غير دقيقة. حدّد اسم القانون أو رقم المادة إن أمكن.';
       await _saveHistory(q, answer, 'gemini_rejected');
       return LegalAiResult(answer: answer, sources: const [], conversationId: conversationId, responseSource: 'gemini_rejected');
     }
@@ -116,6 +129,30 @@ class LegalAiService {
     final match = RegExp(r'نطاق البحث الإلزامي:\s*(.+?)\s*فقط').firstMatch(raw);
     if (match != null && match.group(1)?.trim().isNotEmpty == true) return match.group(1)!.trim();
     return 'الكل';
+  }
+
+  String? _inferLawScope(String question) {
+    final normalized = _normalize(question);
+    if (normalized.contains('احوال شخصيه') || normalized.contains('الاحوال الشخصيه')) return 'الاحوال الشخصية';
+    const patterns = <String, List<String>>{
+      'القانون المدني': ['القانون المدني', 'القانون المدنى'],
+      'الجرائم والعقوبات': ['الجرائم والعقوبات', 'قانون الجرائم', 'قانون العقوبات'],
+      'الإجراءات الجزائية': ['الاجراءات الجزائيه', 'قانون الاجراءات الجزائيه'],
+      'المرافعات والتنفيذ': ['المرافعات والتنفيذ', 'قانون المرافعات'],
+      'قانون العمل': ['قانون العمل'],
+      'القانون التجاري': ['القانون التجاري'],
+      'الإثبات': ['قانون الاثبات', 'الاثبات'],
+      'التحكيم': ['قانون التحكيم', 'التحكيم'],
+    };
+    for (final entry in patterns.entries) {
+      if (entry.value.any(normalized.contains)) return entry.key;
+    }
+    return null;
+  }
+
+  String? _extractRequestedArticleNumber(String question) {
+    final match = RegExp(r'(?:الماده|المادة|ماده|مادة)\\s*(?:رقم\\s*)?(\\d+)').firstMatch(_normalize(question));
+    return match?.group(1);
   }
 
   Future<Law?> _resolveLawScope(List<Law> laws, String scope) async {
@@ -331,9 +368,9 @@ match=true فقط إذا كانت الإجابة مرتبطة مباشرة با�
     try {
       final data = jsonDecode(body) as Map<String, dynamic>;
       final message = ((data['error'] as Map<String, dynamic>?)?['message'] ?? '').toString();
-      if (message.isNotEmpty) return 'تعذر الاتصال بـ Gemini: $message';
+      if (message.isNotEmpty) return 'تعذر إكمال البحث القانوني: $message';
     } catch (_) {}
-    return 'تعذر الاتصال بـ Gemini (HTTP $status).';
+    return 'تعذر إكمال البحث القانوني (رمز الخطأ $status).';
   }
 
   Future<void> _saveHistory(String question, String answer, String source) async {
