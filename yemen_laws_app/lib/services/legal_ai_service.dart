@@ -107,15 +107,33 @@ class LegalAiService {
 
     final ranked = _rankLocalCandidatesLocally(q, candidates);
     if (ranked.isNotEmpty) {
-      final answer = await _answerFromLocalWithGemini(q, requestedScope, ranked, history);
-      final review = await _reviewFinalAnswerWithGemini(q, requestedScope, answer, ranked, history);
-      if (review.isMatch) {
-        await _saveHistory(q, answer, 'local_sources_explained');
-        return LegalAiResult(answer: answer, sources: ranked.map(LegalAiSource.fromMadda).toList(), conversationId: conversationId, responseSource: 'cloudflare_local_sources');
+      try {
+        final result = await _askCloudflare(
+          question: q,
+          scope: requestedScope,
+          history: history,
+          sources: ranked,
+        );
+        await _saveHistory(q, result.answer, 'cloudflare_local_sources');
+        return LegalAiResult(
+          answer: result.answer,
+          sources: ranked.map(LegalAiSource.fromMadda).toList(),
+          conversationId: result.conversationId ?? conversationId,
+          responseSource: 'cloudflare_local_sources',
+        );
+      } catch (_) {
+        // لا نجعل تعطل الإنترنت يمنع عرض النصوص المحلية التي عثرنا عليها.
+        final answer = ranked.map((m) =>
+          '${m.lawName ?? 'القوانين اليمنية'}، المادة ${m.number}:\\n${m.body.trim()}'
+        ).join('\\n\\n');
+        await _saveHistory(q, answer, 'local_sources_offline');
+        return LegalAiResult(
+          answer: answer,
+          sources: ranked.map(LegalAiSource.fromMadda).toList(),
+          conversationId: conversationId,
+          responseSource: 'local_sources_offline',
+        );
       }
-      const retry = 'حاول مرة أخرى.';
-      await _saveHistory(q, retry, 'answer_review_failed');
-      return LegalAiResult(answer: retry, sources: const [], conversationId: conversationId, responseSource: 'answer_review_failed');
     }
 
     // إذا لم يجد Gemini نصاً مناسباً داخل قاعدة التطبيق، ينتقل إلى معرفته القانونية.
