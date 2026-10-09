@@ -97,9 +97,7 @@ jobs:
         run: flutter test
 
       - name: Build release APK
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: flutter build apk --release --dart-define=GEMINI_API_KEY="$GEMINI_API_KEY" --dart-define=APP_VERSION=1.0.0
+        run: flutter build apk --release --dart-define=LEGAL_AI_BASE_URL=https://odd-mouse-c1e0.ghgfcrcgrf57566.workers.dev --dart-define=APP_VERSION=1.0.0
 
       - name: Check if Supreme Court PDF release exists
         env:
