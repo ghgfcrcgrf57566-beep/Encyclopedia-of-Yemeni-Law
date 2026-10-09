@@ -98,6 +98,34 @@ class LegalAiService {
       }
     }
 
+    // لا تستدعِ Gemini مباشرة من APK إذا لم يُمرر مفتاح API؛ المفتاح السري
+    // يجب أن يبقى في الخادم. عند تعذر الوصول للخادم، نعرض نتائج SQLite المحلية
+    // بدل إرسال طلب غير موثق إلى Google وإظهار خطأ callers غير المسجلين.
+    if (AppConfig.geminiApiKey.trim().isEmpty) {
+      final localRows = await _searchLocal(q, lawId: selectedLaw?.id, limit: 8);
+      if (localRows.isEmpty) {
+        const answer = 'تعذر الوصول إلى خدمة المساعد، ولم أعثر في قاعدة القوانين المحلية على مواد مرتبطة بما يكفي للإجابة. تحقق من اتصال الإنترنت وحاول مرة أخرى.';
+        await _saveHistory(q, answer, 'local_no_match');
+        return LegalAiResult(answer: answer, sources: const [], conversationId: conversationId, responseSource: 'local_no_match');
+      }
+      final uniqueRows = <Madda>[];
+      final rowIds = <int>{};
+      for (final row in localRows) {
+        if (rowIds.add(row.id)) uniqueRows.add(row);
+      }
+      final answer = 'تعذر الوصول مؤقتًا إلى خدمة صياغة الإجابة. هذه نتائج البحث من قاعدة القوانين المحلية، وليست حكمًا بأن كل نتيجة تنطبق على سؤالك:\\n\\n' +
+          uniqueRows.take(5).map((m) =>
+            '${m.lawName ?? 'القوانين اليمنية'}، المادة ${m.number}:\\n${m.body.trim()}'
+          ).join('\\n\\n---\\n\\n');
+      await _saveHistory(q, answer, 'local_search_fallback');
+      return LegalAiResult(
+        answer: answer,
+        sources: uniqueRows.take(5).map(LegalAiSource.fromMadda).toList(),
+        conversationId: conversationId,
+        responseSource: 'local_search_fallback',
+      );
+    }
+
     final plan = await _planSearchWithGemini(q, requestedScope, history);
     final queries = <String>{
       ...plan.queries.where((v) => v.trim().isNotEmpty),
@@ -176,7 +204,17 @@ class LegalAiService {
       ).timeout(const Duration(seconds: 55));
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        return null;
+        String message = 'تعذر الاتصال بخدمة المساعد القانوني (HTTP ${response.statusCode}).';
+        try {
+          final errorPayload = jsonDecode(response.body);
+          if (errorPayload is Map<String, dynamic>) {
+            final serverMessage = (errorPayload['error'] ?? errorPayload['message'] ?? '').toString().trim();
+            if (serverMessage.isNotEmpty) message = serverMessage;
+          }
+        } catch (_) {
+          // احتفظ برسالة الحالة العامة إذا لم يكن الرد JSON.
+        }
+        throw LegalAiException(message);
       }
       final payload = jsonDecode(response.body);
       if (payload is! Map<String, dynamic>) return null;
