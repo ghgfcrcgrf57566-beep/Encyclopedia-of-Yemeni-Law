@@ -16,6 +16,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  legal-ai-backend-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend/legal-ai
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/legal-ai/package.json
+      - name: Install backend dependencies
+        run: npm install --no-audit --no-fund
+      - name: Type-check Cloudflare Worker
+        run: npm run typecheck
+
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
