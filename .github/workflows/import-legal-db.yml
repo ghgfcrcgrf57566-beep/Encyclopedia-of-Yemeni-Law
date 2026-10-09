@@ -24,6 +24,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       REINDEX_TOKEN: ${{ secrets.REINDEX_TOKEN }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       LEGAL_AI_BASE_URL: https://odd-mouse-c1e0.ghgfcrcgrf57566.workers.dev
     defaults:
       run:
@@ -90,6 +91,17 @@ jobs:
             echo "Checking $table"
             wrangler d1 execute yemen_laws_db --remote --config backend/legal-ai/wrangler.jsonc --command "SELECT COUNT(*) AS count FROM $table;"
           done
+
+      - name: Configure Worker secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "$REINDEX_TOKEN" | wrangler secret put REINDEX_TOKEN --config backend/legal-ai/wrangler.jsonc
+          if [[ -n "${GEMINI_API_KEY:-}" ]]; then
+            printf '%s' "$GEMINI_API_KEY" | wrangler secret put GEMINI_API_KEY --config backend/legal-ai/wrangler.jsonc
+          else
+            echo "::warning::GEMINI_API_KEY GitHub secret is not configured; chat generation may remain unavailable, but indexing can proceed."
+          fi
 
       - name: Deploy the legal AI Worker implementation
         run: wrangler deploy --config backend/legal-ai/wrangler.jsonc
