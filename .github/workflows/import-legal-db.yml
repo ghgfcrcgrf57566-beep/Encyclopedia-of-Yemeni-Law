@@ -91,6 +91,9 @@ jobs:
             wrangler d1 execute yemen_laws_db --remote --config backend/legal-ai/wrangler.jsonc --command "SELECT COUNT(*) AS count FROM $table;"
           done
 
+      - name: Deploy the legal AI Worker implementation
+        run: wrangler deploy --config backend/legal-ai/wrangler.jsonc
+
       - name: Reindex legal articles in Vectorize
         shell: bash
         run: |
