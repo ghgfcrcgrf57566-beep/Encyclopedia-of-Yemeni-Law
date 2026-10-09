@@ -113,21 +113,43 @@ jobs:
           after=0
           while true; do
             echo "Reindexing after id=$after"
-            response="$(curl --fail --silent --show-error --location --max-time 180 \
-              -X POST "$LEGAL_AI_BASE_URL/admin/reindex?after=$after&limit=40" \
-              -H "Authorization: Bearer $REINDEX_TOKEN" \
-              -H 'Accept: application/json')"
+            attempt=1
+            while true; do
+              if response="$(curl --fail --silent --show-error --location --max-time 180 \
+                -X POST "$LEGAL_AI_BASE_URL/admin/reindex?after=$after&limit=20" \
+                -H "Authorization: Bearer $REINDEX_TOKEN" \
+                -H 'Accept: application/json')"; then
+                break
+              fi
+              if [[ "$attempt" -ge 4 ]]; then
+                echo "::error::Reindex request failed after $attempt attempts at cursor $after."
+                exit 1
+              fi
+              delay=$((attempt * 5))
+              echo "Reindex request failed; retrying in ${delay}s (attempt $attempt/4)."
+              sleep "$delay"
+              attempt=$((attempt + 1))
+            done
             printf '%s\n' "$response"
             read -r done next_after processed < <(python -c 'import json,sys; p=json.loads(sys.argv[1]); print(str(bool(p.get("done"))).lower(), int(p.get("next_after",0)), int(p.get("processed",0)))' "$response")
-            if [[ "$processed" -eq 0 || "$done" == "true" ]]; then
-              echo "Reindex endpoint reports completion."
-              break
+            if [[ "$processed" -eq 0 ]]; then
+              if [[ "$done" == "true" ]]; then
+                echo "Reindex endpoint confirms completion."
+                break
+              fi
+              echo "::error::Reindex returned zero vectors before completion at cursor $after."
+              exit 1
             fi
             if [[ "$next_after" -le "$after" ]]; then
               echo "::error::Reindex cursor did not advance."
               exit 1
             fi
             after="$next_after"
+            if [[ "$done" == "true" ]]; then
+              echo "Reindex endpoint confirms completion."
+              break
+            fi
+            sleep 1
           done
 
       - name: Verify health endpoint
