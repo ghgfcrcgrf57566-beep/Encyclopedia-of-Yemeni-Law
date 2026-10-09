@@ -426,43 +426,167 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFF120D09),
-    appBar: AppBar(
-      backgroundColor: const Color(0xFF21150D), centerTitle: true,
-      title: const Text('المكتبة', style: TextStyle(color: Color(0xFFE5BE72), fontWeight: FontWeight.bold)),
-      actions: [
-        IconButton(
-          tooltip: 'مدير التنزيلات',
-          onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-            builder: (_) => _DownloadManagerScreen(
-              items: _libraryItems,
-              downloaded: _downloaded,
-              progress: _progress,
-              onDownload: _download,
-              onPause: _pause,
-              onDelete: _deleteLocal,
-              onOpen: (item) async {
-                final file = await _file(item);
-                if (await file.exists() && mounted) _openPdf(file.path, (item['title'] ?? 'الكتاب').toString());
-              },
-            ),
-          )),
-          icon: const Icon(Icons.download_for_offline_rounded, color: Color(0xFFD4AF37)),
+  Widget build(BuildContext context) {
+    const burgundy = Color(0xFF2B0B14);
+    const black = Color(0xFF12070A);
+    const gold = Color(0xFFD4AF37);
+    const goldLight = Color(0xFFF4D982);
+
+    return Scaffold(
+      backgroundColor: black,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: [burgundy, Color(0xFF210810), black],
+          ),
         ),
-      ],
-    ),
-    body: _loading && _items.isEmpty
-      ? const Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37)))
-      : ListView(padding: const EdgeInsets.fromLTRB(14, 18, 14, 30), children: [
-          _HeroCard(icon: Icons.library_books_rounded, title: 'المكتبة', subtitle: 'مراجع قانونية ومراجع شرعية مرتبة حسب الموضوع'),
-          const SizedBox(height: 16),
-          _TopCard(icon: Icons.balance_rounded, title: 'المكتبة القانونية', subtitle: 'شروح القوانين والكتب والدراسات والموسوعات القانونية', onTap: () => _openSection('المكتبة القانونية', false)),
-          const SizedBox(height: 12),
-          _TopCard(icon: Icons.menu_book_rounded, title: 'المكتبة الشرعية', subtitle: 'الفقه والمذاهب والفتاوى وأصول الفقه والمواريث', onTap: () => _openSection('المكتبة الشرعية', true)),
-        ]),
-  );
-}
+        child: Stack(
+          children: [
+            const Positioned.fill(
+              child: IgnorePointer(child: _IslamicPatternBackground()),
+            ),
+            SafeArea(
+              bottom: false,
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                    child: SizedBox(
+                      height: 66,
+                      child: Row(
+                        children: [
+                          _LibraryHeaderButton(
+                            icon: Icons.arrow_forward_rounded,
+                            tooltip: 'رجوع',
+                            onTap: () => Navigator.of(context).maybePop(),
+                          ),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.auto_awesome, color: goldLight, size: 16),
+                                SizedBox(height: 1),
+                                Text(
+                                  'المكتبة',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: goldLight,
+                                    fontSize: 29,
+                                    fontWeight: FontWeight.w900,
+                                    height: 1.1,
+                                    shadows: [Shadow(color: Color(0x665B3300), blurRadius: 12, offset: Offset(0, 3))],
+                                  ),
+                                ),
+                                SizedBox(height: 6),
+                                _LibraryGoldDivider(width: 108),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          _LibraryHeaderButton(
+                            icon: Icons.download_rounded,
+                            tooltip: 'مدير التنزيلات',
+                            onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                              builder: (_) => _DownloadManagerScreen(
+                                items: _libraryItems,
+                                downloaded: _downloaded,
+                                progress: _progress,
+                                onDownload: _download,
+                                onPause: _pause,
+                                onDelete: _deleteLocal,
+                                onOpen: (item) async {
+                                  final file = await _file(item);
+                                  if (await file.exists() && mounted) {
+                                    _openPdf(file.path, (item['title'] ?? 'الكتاب').toString());
+                                  }
+                                },
+                              ),
+                            )),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final width = MediaQuery.sizeOf(context).width;
+                        final compact = width < 360;
+                        final heroHeight = (constraints.maxHeight * 0.255).clamp(172.0, 218.0);
+                        final gridHeight = (constraints.maxHeight * 0.51).clamp(310.0, 410.0);
+
+                        return ListView(
+                          physics: const BouncingScrollPhysics(),
+                          padding: EdgeInsets.fromLTRB(compact ? 13 : 19, 4, compact ? 13 : 19, 24),
+                          children: [
+                            _LibraryHeroBentoCard(
+                              height: heroHeight,
+                              loading: _loading,
+                              bookCount: _libraryItems.length,
+                              onTap: () => _openSection('المكتبة القانونية', false),
+                            ),
+                            const SizedBox(height: 22),
+                            const Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('تصفح المكتبة', style: TextStyle(color: goldLight, fontSize: 18, fontWeight: FontWeight.w800)),
+                                SizedBox(height: 4),
+                                Text('اختر القسم الذي تريد استكشافه', style: TextStyle(color: Color(0xFFD5C9C9), fontSize: 12)),
+                              ],
+                            ),
+                            const SizedBox(height: 13),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: _LibraryBentoCategoryCard(
+                                    height: gridHeight,
+                                    title: 'المكتبة القانونية',
+                                    description: 'شروح القوانين والكتب والدراسات والموسوعات القانونية',
+                                    icon: Icons.balance_rounded,
+                                    art: _LibraryArtwork.legal,
+                                    count: _libraryItems.where((item) => !_isSharia(item) && !_isSupremeCourt(item)).length,
+                                    onTap: () => _openSection('المكتبة القانونية', false),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _LibraryBentoCategoryCard(
+                                    height: gridHeight,
+                                    title: 'المكتبة الشرعية',
+                                    description: 'الفقه والمذاهب والفتاوى وأصول الفقه والمواريث',
+                                    icon: Icons.menu_book_rounded,
+                                    art: _LibraryArtwork.sharia,
+                                    count: _libraryItems.where((item) => _isSharia(item)).length,
+                                    onTap: () => _openSection('المكتبة الشرعية', true),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                            const Center(
+                              child: Text(
+                                'موسوعة القانون اليمني',
+                                style: TextStyle(color: Color(0xFF8F797D), fontSize: 11),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                  const _LibraryHomeIndicator(),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
 class _CategoryScreen extends StatelessWidget {
   final String title;
@@ -491,7 +615,6 @@ class _CategoryScreen extends StatelessWidget {
     final t = _text(e);
     if (_isSanhouri(e) || t.contains('شرح') || t.contains('موسوعة') || t.contains('حاشية')) return 'الشروح والموسوعات';
     if (t.contains('قاموس') || t.contains('معجم') || t.contains('مصطلحات القانون')) return 'المعاجم والمداخل القانونية';
-    if (t.contains('دراسة') || t.contains('بحث') || t.contains('أبحاث') || t.contains('دراسات')) return 'الدراسات والأبحاث';
     if (t.contains('دولي') || t.contains('مقارن') || t.contains('تنازع القوانين')) return 'القانون الدولي والمقارن';
     if (t.contains('أحوال شخصية') || t.contains('الزواج') || t.contains('الطلاق') || t.contains('الأسرة')) return 'الأحوال الشخصية';
     if (t.contains('عمل') || t.contains('عمال')) return 'قانون العمل';
@@ -519,7 +642,7 @@ class _CategoryScreen extends StatelessWidget {
     if (t.contains('معاملات') || t.contains('بيع') || t.contains('عقود')) return 'فقه المعاملات';
     if (t.contains('شرح') || t.contains('حاشية')) return 'الشروح والحواشي';
     if (t.contains('مقارن') || t.contains('مقارنة')) return 'الفقه المقارن';
-    return 'التراث الإسلامي';
+    return 'الفقه المقارن';
   }
 
   @override
@@ -1492,4 +1615,390 @@ class _BookCard extends StatelessWidget {
       ),
     );
   }
+}
+
+
+/// مكونات واجهة المكتبة الرئيسية: Bento Grid عنابي وذهبي.
+class _LibraryHeaderButton extends StatelessWidget {
+  const _LibraryHeaderButton({required this.icon, required this.tooltip, this.onTap});
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: tooltip,
+    child: Material(
+      color: const Color(0xFF1E080F),
+      shape: const CircleBorder(),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: const Color(0xBFD4AF37)),
+          ),
+          child: Icon(icon, color: const Color(0xFFF4D982), size: 22),
+        ),
+      ),
+    ),
+  );
+}
+
+class _LibraryGoldDivider extends StatelessWidget {
+  const _LibraryGoldDivider({this.width = 100});
+  final double width;
+  @override
+  Widget build(BuildContext context) => Container(
+    width: width,
+    height: 1.2,
+    decoration: const BoxDecoration(
+      gradient: LinearGradient(
+        colors: [Colors.transparent, Color(0xFFD4AF37), Color(0xFFF4D982), Color(0xFFD4AF37), Colors.transparent],
+      ),
+    ),
+  );
+}
+
+class _LibraryHeroBentoCard extends StatelessWidget {
+  const _LibraryHeroBentoCard({required this.height, required this.loading, required this.bookCount, this.onTap});
+  final double height;
+  final bool loading;
+  final int bookCount;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    height: height,
+    decoration: BoxDecoration(
+      color: const Color(0xF51E080F),
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(color: const Color(0xBFD4AF37), width: 1.1),
+      boxShadow: const [
+        BoxShadow(color: Color(0x20D4AF37), blurRadius: 20, spreadRadius: 1, offset: Offset(0, 5)),
+        BoxShadow(color: Color(0x66000000), blurRadius: 15, offset: Offset(0, 8)),
+      ],
+    ),
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(23),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          child: Stack(
+            children: [
+              Positioned(left: -35, top: -55, child: Container(
+                width: 170, height: 170,
+                decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFFD4AF37).withOpacity(.06)),
+              )),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 38),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      flex: 5,
+                      child: _LibraryBookArtwork(),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 6,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerRight,
+                            child: Text('المكتبة', style: TextStyle(color: Color(0xFFF4D982), fontSize: 29, fontWeight: FontWeight.w900)),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'مراجع قانونية ومراجع شرعية مرتبة حسب الموضوع',
+                            style: TextStyle(color: Color(0xFFF9F5F0), fontSize: 12.5, height: 1.8),
+                          ),
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFD4AF37).withOpacity(.10),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: const Color(0x66D4AF37)),
+                            ),
+                            child: Text(
+                              loading ? 'جارٍ تحميل الفهرس…' : '$bookCount كتابًا ومرجعًا',
+                              style: const TextStyle(color: Color(0xFFF4D982), fontSize: 10.5, fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Positioned(bottom: 11, right: 13, child: _LibraryArrowButton()),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+enum _LibraryArtwork { legal, sharia }
+
+class _LibraryBentoCategoryCard extends StatelessWidget {
+  const _LibraryBentoCategoryCard({
+    required this.height, required this.title, required this.description,
+    required this.icon, required this.art, required this.count, this.onTap,
+  });
+  final double height;
+  final String title;
+  final String description;
+  final IconData icon;
+  final _LibraryArtwork art;
+  final int count;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    height: height,
+    decoration: BoxDecoration(
+      color: const Color(0xF51E080F),
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(color: const Color(0xBFD4AF37), width: 1.05),
+      boxShadow: const [
+        BoxShadow(color: Color(0x16D4AF37), blurRadius: 15, offset: Offset(0, 5)),
+        BoxShadow(color: Color(0x44000000), blurRadius: 12, offset: Offset(0, 7)),
+      ],
+    ),
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(23),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
+            child: Column(
+              children: [
+                Expanded(
+                  flex: 11,
+                  child: _LibraryCategoryArtwork(art: art, icon: icon),
+                ),
+                const SizedBox(height: 9),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(title, textAlign: TextAlign.center,
+                    style: const TextStyle(color: Color(0xFFF4D982), fontSize: 16, fontWeight: FontWeight.w900)),
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  flex: 6,
+                  child: Text(description, textAlign: TextAlign.center, maxLines: 5, overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Color(0xFFF1E9E8), fontSize: 11.5, height: 1.8)),
+                ),
+                Text('$count مرجع', style: const TextStyle(color: Color(0xFFB9A5A8), fontSize: 10)),
+                const SizedBox(height: 7),
+                const _LibraryArrowButton(size: 42),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// رسم بديل مدمج للصور ثلاثية الأبعاد إلى أن تُضاف ملفات PNG الواقعية للأصول.
+class _LibraryBookArtwork extends StatelessWidget {
+  const _LibraryBookArtwork();
+  @override
+  Widget build(BuildContext context) => Stack(
+    alignment: Alignment.center,
+    children: [
+      Container(
+        width: 125, height: 125,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(colors: [const Color(0xFFD4AF37).withOpacity(.14), Colors.transparent]),
+        ),
+      ),
+      Transform.rotate(
+        angle: -.12,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _BookSpine(width: 25, height: 94, color: const Color(0xFF243A35)),
+            const SizedBox(width: 3),
+            _BookSpine(width: 29, height: 111, color: const Color(0xFF5B3024)),
+            const SizedBox(width: 3),
+            _BookSpine(width: 34, height: 101, color: const Color(0xFF38202A)),
+          ],
+        ),
+      ),
+    ],
+  );
+}
+
+class _BookSpine extends StatelessWidget {
+  const _BookSpine({required this.width, required this.height, required this.color});
+  final double width;
+  final double height;
+  final Color color;
+  @override
+  Widget build(BuildContext context) => Container(
+    width: width, height: height,
+    decoration: BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(5),
+      border: Border.all(color: const Color(0xFFD4AF37).withOpacity(.8), width: 1),
+      boxShadow: const [BoxShadow(color: Color(0x77000000), blurRadius: 8, offset: Offset(3, 4))],
+    ),
+    child: Center(
+      child: Container(
+        width: width * .65, height: height * .78,
+        decoration: BoxDecoration(
+          border: Border.symmetric(horizontal: BorderSide(color: const Color(0xFFD4AF37).withOpacity(.55), width: 1)),
+        ),
+        child: Icon(Icons.auto_awesome, size: 12, color: const Color(0xFFD4AF37).withOpacity(.85)),
+      ),
+    ),
+  );
+}
+
+class _LibraryCategoryArtwork extends StatelessWidget {
+  const _LibraryCategoryArtwork({required this.art, required this.icon});
+  final _LibraryArtwork art;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) => Stack(
+    alignment: Alignment.center,
+    children: [
+      Container(
+        width: 140, height: 140,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(colors: [const Color(0xFFD4AF37).withOpacity(.12), Colors.transparent]),
+        ),
+      ),
+      if (art == _LibraryArtwork.legal)
+        const Positioned(bottom: 17, child: Column(
+          children: [
+            _StackedBook(color: Color(0xFF263B39), width: 116),
+            SizedBox(height: 3),
+            _StackedBook(color: Color(0xFF5A3024), width: 126),
+          ],
+        )),
+      if (art == _LibraryArtwork.sharia)
+        Positioned(
+          bottom: 20,
+          child: Transform.rotate(
+            angle: -.05,
+            child: Container(
+              width: 115, height: 12,
+              decoration: BoxDecoration(color: const Color(0xFF70452D), borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: const Color(0xFFD4AF37).withOpacity(.7))),
+            ),
+          ),
+        ),
+      Positioned(
+        top: art == _LibraryArtwork.legal ? 4 : 18,
+        child: Icon(
+          art == _LibraryArtwork.legal ? Icons.balance_rounded : Icons.menu_book_rounded,
+          size: art == _LibraryArtwork.legal ? 88 : 92,
+          color: const Color(0xFFE5C46A),
+          shadows: const [Shadow(color: Color(0xAA000000), blurRadius: 10, offset: Offset(3, 5))],
+        ),
+      ),
+    ],
+  );
+}
+
+class _StackedBook extends StatelessWidget {
+  const _StackedBook({required this.color, required this.width});
+  final Color color;
+  final double width;
+  @override
+  Widget build(BuildContext context) => Container(
+    width: width, height: 19,
+    decoration: BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(4),
+      border: Border.all(color: const Color(0xFFD4AF37).withOpacity(.75)),
+      boxShadow: const [BoxShadow(color: Color(0x99000000), blurRadius: 5, offset: Offset(2, 3))],
+    ),
+  );
+}
+
+class _LibraryArrowButton extends StatelessWidget {
+  const _LibraryArrowButton({this.size = 44});
+  final double size;
+  @override
+  Widget build(BuildContext context) => Container(
+    width: size, height: size,
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
+        colors: [Color(0xFFFFE7A0), Color(0xFFD4AF37), Color(0xFFB88A24)]),
+      borderRadius: BorderRadius.circular(size * .28),
+      border: Border.all(color: const Color(0xFFFFE9A6), width: .8),
+      boxShadow: const [BoxShadow(color: Color(0x44D4AF37), blurRadius: 10, offset: Offset(0, 3))],
+    ),
+    child: const Icon(Icons.chevron_right_rounded, color: Color(0xFF321309), size: 34),
+  );
+}
+
+class _LibraryHomeIndicator extends StatelessWidget {
+  const _LibraryHomeIndicator();
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 8, bottom: 7),
+    child: Container(width: 108, height: 4,
+      decoration: BoxDecoration(color: Colors.white.withOpacity(.9), borderRadius: BorderRadius.circular(20))),
+  );
+}
+
+class _IslamicPatternBackground extends StatelessWidget {
+  const _IslamicPatternBackground();
+  @override
+  Widget build(BuildContext context) => CustomPaint(painter: _IslamicPatternPainter());
+}
+
+class _IslamicPatternPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFFD4AF37).withOpacity(.035)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = .8;
+    const spacing = 43.0;
+    for (double y = 0; y < size.height + spacing; y += spacing) {
+      for (double x = 0; x < size.width + spacing; x += spacing) {
+        final cx = x + spacing / 2;
+        final cy = y + spacing / 2;
+        const radius = spacing * .37;
+        final path = Path();
+        for (int i = 0; i < 8; i++) {
+          final angle = math.pi / 4 * i - math.pi / 8;
+          final px = cx + radius * math.cos(angle);
+          final py = cy + radius * math.sin(angle);
+          if (i == 0) { path.moveTo(px, py); } else { path.lineTo(px, py); }
+        }
+        path.close();
+        canvas.drawPath(path, paint);
+        final diamond = Path()
+          ..moveTo(cx, cy - radius * .55)
+          ..lineTo(cx + radius * .55, cy)
+          ..lineTo(cx, cy + radius * .55)
+          ..lineTo(cx - radius * .55, cy)
+          ..close();
+        canvas.drawPath(diamond, paint);
+      }
+    }
+  }
+  @override
+  bool shouldRepaint(covariant _IslamicPatternPainter oldDelegate) => false;
 }
