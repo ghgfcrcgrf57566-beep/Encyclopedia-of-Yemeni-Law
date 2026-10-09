@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -1028,7 +1029,7 @@ class _BookDetailsScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             textDirection: TextDirection.rtl,
             children: [
-              _DetailCover(url: cover),
+              _DetailCover(url: cover, item: item),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -1111,45 +1112,179 @@ class _BookDetailsScreen extends StatelessWidget {
   }
 }
 
-class _DetailCover extends StatelessWidget {
-  final String url;
-  const _DetailCover({required this.url});
+/// يعرض الغلاف المسجل، أو يبحث عنه عند الحاجة في Open Library.
+/// البحث متسلسل ومخزن مؤقتًا لتجنب إرسال طلب لكل إعادة بناء للواجهة.
+class _ResolvedBookCover extends StatefulWidget {
+  final Map<String, dynamic> item;
+  final String suppliedUrl;
+  final double width;
+  final double height;
+  final double iconSize;
+  final bool rounded;
+
+  const _ResolvedBookCover({
+    required this.item,
+    required this.suppliedUrl,
+    required this.width,
+    required this.height,
+    required this.iconSize,
+    this.rounded = false,
+  });
 
   @override
-  Widget build(BuildContext context) {
-    if (url.isEmpty) {
-      return Container(
-        width: 130,
-        height: 180,
-        decoration: BoxDecoration(
-          color: const Color(0xFF2A1A10),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0x66D4AF37)),
-        ),
-        child: const Icon(Icons.menu_book_rounded, size: 52, color: Color(0xFFD4AF37)),
-      );
-    }
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: CachedNetworkImage(
-        imageUrl: url,
-        width: 130,
-        height: 180,
-        fit: BoxFit.cover,
-        fadeInDuration: const Duration(milliseconds: 250),
-        placeholder: (_, __) => const SizedBox(
-          width: 130,
-          height: 180,
-          child: Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37))),
-        ),
-        errorWidget: (_, __, ___) => const SizedBox(
-          width: 130,
-          height: 180,
-          child: Center(child: Icon(Icons.menu_book_rounded, size: 52, color: Color(0xFFD4AF37))),
-        ),
-      ),
-    );
+  State<_ResolvedBookCover> createState() => _ResolvedBookCoverState();
+}
+
+class _ResolvedBookCoverState extends State<_ResolvedBookCover> {
+  static final Map<String, Future<String?>> _memoryCache = {};
+  static Future<void> _requestQueue = Future<void>.value();
+  static DateTime _lastRequestAt = DateTime.fromMillisecondsSinceEpoch(0);
+  static final Dio _coverDio = Dio(BaseOptions(
+    connectTimeout: const Duration(seconds: 8),
+    receiveTimeout: const Duration(seconds: 8),
+    responseType: ResponseType.json,
+    headers: {'User-Agent': 'YemenLawEncyclopedia/1.0 (book cover lookup)'},
+  ));
+
+  late Future<String?> _coverFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _coverFuture = _resolve();
   }
+
+  @override
+  void didUpdateWidget(covariant _ResolvedBookCover oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.suppliedUrl != widget.suppliedUrl ||
+        oldWidget.item['id'] != widget.item['id'] ||
+        oldWidget.item['title'] != widget.item['title']) {
+      _coverFuture = _resolve();
+    }
+  }
+
+  String _normalize(String value) => value
+      .toLowerCase()
+      .replaceAll(RegExp(r'[ـًٌٍَُِّْٰ]'), '')
+      .replaceAll(RegExp(r'[أإآٱ]'), 'ا')
+      .replaceAll(RegExp(r'ى'), 'ي')
+      .replaceAll(RegExp(r'[^\p{L}\p{N}]+', unicode: true), ' ')
+      .trim()
+      .replaceAll(RegExp(r'\s+'), ' ');
+
+  Future<String?> _resolve() async {
+    final provided = widget.suppliedUrl.trim();
+    if (provided.startsWith('https://') || provided.startsWith('http://')) {
+      return provided;
+    }
+    final title = (widget.item['title'] ?? '').toString().trim();
+    if (title.isEmpty) return null;
+    final id = (widget.item['id'] ?? title).toString();
+    final key = 'library_cover_url_v1_' + id;
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString(key);
+    if (saved != null && saved.isNotEmpty) return saved;
+
+    return _memoryCache.putIfAbsent(id, () {
+      final completer = Completer<String?>();
+      _requestQueue = _requestQueue.then((_) async {
+        try {
+          final elapsed = DateTime.now().difference(_lastRequestAt);
+          if (elapsed < const Duration(seconds: 1)) {
+            await Future<void>.delayed(const Duration(seconds: 1) - elapsed);
+          }
+          _lastRequestAt = DateTime.now();
+          final response = await _coverDio.get<dynamic>(
+            'https://openlibrary.org/search.json',
+            queryParameters: {
+              'title': title,
+              'fields': 'title,cover_i',
+              'limit': 5,
+            },
+          );
+          final data = response.data;
+          final docs = data is Map ? data['docs'] : null;
+          String? result;
+          if (docs is List) {
+            final wanted = _normalize(title);
+            for (final doc in docs) {
+              if (doc is! Map) continue;
+              final foundTitle = _normalize((doc['title'] ?? '').toString());
+              final coverId = doc['cover_i'];
+              // لا نعرض غلافًا إلا عند تطابق العنوان بعد تطبيع اختلافات الكتابة العربية.
+              if (foundTitle == wanted && coverId != null) {
+                result = 'https://covers.openlibrary.org/b/id/$coverId-M.jpg';
+                break;
+              }
+            }
+          }
+          if (result != null) await prefs.setString(key, result);
+          completer.complete(result);
+        } catch (_) {
+          completer.complete(null);
+        }
+      }).catchError((_) {
+        if (!completer.isCompleted) completer.complete(null);
+      });
+      return completer.future;
+    });
+  }
+
+  Widget _placeholder() => Container(
+    width: widget.width,
+    height: widget.height,
+    decoration: BoxDecoration(
+      color: const Color(0xFF21150D),
+      borderRadius: BorderRadius.circular(widget.rounded ? 12 : 4),
+      border: Border.all(color: const Color(0x666D5524)),
+    ),
+    child: Icon(Icons.menu_book_rounded, size: widget.iconSize, color: const Color(0xFFD4AF37)),
+  );
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<String?>(
+    future: _coverFuture,
+    builder: (context, snapshot) {
+      final url = snapshot.data;
+      if (url == null || url.isEmpty) return _placeholder();
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(widget.rounded ? 12 : 4),
+        child: CachedNetworkImage(
+          imageUrl: url,
+          width: widget.width,
+          height: widget.height,
+          fit: BoxFit.cover,
+          fadeInDuration: const Duration(milliseconds: 200),
+          placeholder: (_, __) => SizedBox(
+            width: widget.width,
+            height: widget.height,
+            child: Center(child: SizedBox(
+              width: 20, height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2, color: const Color(0xFFD4AF37)),
+            )),
+          ),
+          errorWidget: (_, __, ___) => _placeholder(),
+        ),
+      );
+    },
+  );
+}
+
+class _DetailCover extends StatelessWidget {
+  final String url;
+  final Map<String, dynamic> item;
+  const _DetailCover({required this.url, required this.item});
+
+  @override
+  Widget build(BuildContext context) => _ResolvedBookCover(
+    item: item,
+    suppliedUrl: url,
+    width: 130,
+    height: 180,
+    iconSize: 52,
+    rounded: true,
+  );
 }
 
 class _DetailSection extends StatelessWidget {
@@ -1491,24 +1626,13 @@ class _BookCard extends StatelessWidget {
     final title = (item['title'] ?? 'كتاب').toString();
     final author = (item['author'] ?? '').toString().trim();
 
-    Widget coverWidget() {
-      if (cover.isEmpty) {
-        return Container(
-          color: const Color(0xFF21150D),
-          child: const Icon(Icons.menu_book_rounded, size: 42, color: Color(0xFFD4AF37)),
-        );
-      }
-      return CachedNetworkImage(
-        imageUrl: cover,
-        fit: BoxFit.cover,
-        placeholder: (_, __) => const Center(
-          child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFD4AF37)),
-        ),
-        errorWidget: (_, __, ___) => const Center(
-          child: Icon(Icons.menu_book_rounded, size: 42, color: Color(0xFFD4AF37)),
-        ),
-      );
-    }
+    Widget coverWidget() => _ResolvedBookCover(
+      item: item,
+      suppliedUrl: cover,
+      width: 88,
+      height: 118,
+      iconSize: 42,
+    );
 
     return InkWell(
       borderRadius: BorderRadius.circular(10),
