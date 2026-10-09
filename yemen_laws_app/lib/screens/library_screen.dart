@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:convert';
 import 'dart:io';
 
@@ -587,6 +588,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
       ),
     );
   }
+}
 
 class _CategoryScreen extends StatelessWidget {
   final String title;
