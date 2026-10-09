@@ -267,7 +267,7 @@ class LegalAiService {
       'عن','على','الى','مع','ماهي','ماهو','اريد','أريد','شروط','حالات',
       'حكم','قانون','القانون','المادة','مادة','رقم','يجوز','يكون','كانت',
     };
-    return _normalize(value).split(RegExp(r'\\s+'))
+    return _normalize(value).split(RegExp(r'\s+'))
         .where((term) => term.length >= 3 && !stopWords.contains(term))
         .toSet().toList();
   }
