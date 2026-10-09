@@ -3,6 +3,8 @@ name: Build Flutter APK
 on:
   push:
     branches: [ main ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
 permissions:
@@ -14,6 +16,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  legal-ai-backend-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend/legal-ai
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install backend dependencies
+        run: npm install --no-audit --no-fund
+      - name: Type-check Cloudflare Worker
+        run: npm run typecheck
+
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -98,8 +118,11 @@ jobs:
 
       - name: Build release APK
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: flutter build apk --release --dart-define=GEMINI_API_KEY="$GEMINI_API_KEY" --dart-define=APP_VERSION=1.0.0
+          LEGAL_AI_BASE_URL: ${{ vars.LEGAL_AI_BASE_URL || 'https://odd-mouse-c1e0.ghgfcrcgrf57566.workers.dev' }}
+        run: |
+          set -e
+          test -n "$LEGAL_AI_BASE_URL" || { echo "Set repository variable LEGAL_AI_BASE_URL to the deployed Cloudflare Worker URL."; exit 1; }
+          flutter build apk --release --dart-define=LEGAL_AI_BASE_URL="$LEGAL_AI_BASE_URL" --dart-define=APP_VERSION=1.0.0
 
       - name: Check if Supreme Court PDF release exists
         env:

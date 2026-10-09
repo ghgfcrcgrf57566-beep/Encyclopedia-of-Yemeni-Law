@@ -30,6 +30,8 @@ type ChatRequestBody = {
   conversation_id?: unknown;
   history?: unknown;
   language?: unknown;
+  scope?: unknown;
+  sources?: unknown;
 };
 
 type EmbeddingResponse = {
@@ -153,11 +155,15 @@ async function handleChat(request: Request, env: Env): Promise<Response> {
         : crypto.randomUUID();
 
     const maxResults = Math.min(Math.max(Number(env.MAX_RESULTS || 8), 1), 12);
-    const sources = await retrieveLegalSources(
-      question,
-      env,
-      maxResults,
-    );
+    const scope = typeof body.scope === "string" ? body.scope.trim().slice(0, 120) : "";
+    const suppliedSources = normalizeSuppliedSources(body.sources, maxResults);
+    const sources = suppliedSources.length > 0
+      ? suppliedSources
+      : await retrieveLegalSources(
+          scope ? `${scope} ${question}` : question,
+          env,
+          maxResults,
+        );
 
     const provider = createAIProvider(env);
     const result = await provider.generateAnswer({
@@ -191,6 +197,29 @@ async function handleChat(request: Request, env: Env): Promise<Response> {
 
     return json({ error: "حدث خطأ داخلي أثناء معالجة السؤال." }, 500);
   }
+}
+
+function normalizeSuppliedSources(value: unknown, limit: number): AIProviderSource[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item: any) =>
+      item &&
+      Number.isFinite(Number(item.article_id ?? item.id)) &&
+      typeof (item.article_text ?? item.body) === "string" &&
+      (item.article_text ?? item.body).trim().length > 0 &&
+      typeof (item.law_name ?? item.law) === "string" &&
+      String(item.law_name ?? item.law).trim().length > 0
+    )
+    .slice(0, limit)
+    .map((item: any) => ({
+      article_id: Number(item.article_id ?? item.id),
+      law_name: String(item.law_name ?? item.law).slice(0, 200),
+      article_number: String(item.article_number ?? item.number ?? "").slice(0, 80),
+      article_text: String(item.article_text ?? item.body).slice(0, 12000),
+      chapter: typeof item.chapter === "string" ? item.chapter.slice(0, 200) : null,
+      reference: typeof item.reference === "string" ? item.reference.slice(0, 300) : undefined,
+      score: 1,
+    }));
 }
 
 async function retrieveLegalSources(
