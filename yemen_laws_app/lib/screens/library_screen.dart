@@ -212,9 +212,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
       final title = (item['title'] ?? '').toString().toLowerCase()
           .replaceAll(RegExp(r'[ـًٌٍَُِّْٰ]'), '')
           .replaceAll(RegExp(r'[أإآ]'), 'ا')
-          .replaceAll(RegExp(r'[^\\p{L}\\p{N}]+', unicode: true), ' ')
+          .replaceAll(RegExp(r'[^\p{L}\p{N}]+', unicode: true), ' ')
           .trim()
-          .replaceAll(RegExp(r'\\s+'), ' ');
+          .replaceAll(RegExp(r'\s+'), ' ');
       if ((id.isNotEmpty && !seenIds.add(id)) ||
           (title.isNotEmpty && !seenTitles.add(title))) {
         continue;
