@@ -100,7 +100,7 @@ jobs:
 
       - name: Build release APK
         env:
-          LEGAL_AI_BASE_URL: ${{ vars.LEGAL_AI_BASE_URL }}
+          LEGAL_AI_BASE_URL: ${{ vars.LEGAL_AI_BASE_URL || 'https://odd-mouse-c1e0.ghgfcrcgrf57566.workers.dev' }}
         run: |
           set -e
           test -n "$LEGAL_AI_BASE_URL" || { echo "Set repository variable LEGAL_AI_BASE_URL to the deployed Cloudflare Worker URL."; exit 1; }
