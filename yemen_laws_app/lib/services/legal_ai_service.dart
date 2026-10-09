@@ -73,7 +73,7 @@ class LegalAiService {
             final review = await _reviewFinalAnswerWithGemini(q, selectedLaw.name, explanation, source, history);
             if (review.isMatch) {
               await _saveHistory(q, explanation, 'local_article_explained');
-              return LegalAiResult(answer: explanation, sources: [LegalAiSource.fromMadda(m)], conversationId: conversationId, responseSource: 'local_article_explained');
+              return LegalAiResult(answer: explanation, sources: const [], conversationId: conversationId, responseSource: 'local_article_explained');
             }
           } catch (_) {
             // عند تعذر الشرح، لا نفقد النص القانوني الأصلي الموثق.
@@ -81,7 +81,7 @@ class LegalAiService {
         }
         final answer = '${m.lawName ?? selectedLaw.name}، المادة ${m.number}:\n\n${m.body.trim()}';
         await _saveHistory(q, answer, 'local_exact_article');
-        return LegalAiResult(answer: answer, sources: [LegalAiSource.fromMadda(m)], conversationId: conversationId, responseSource: 'local_exact_article');
+        return LegalAiResult(answer: answer, sources: const [], conversationId: conversationId, responseSource: 'local_exact_article');
       }
     }
 
@@ -107,7 +107,7 @@ class LegalAiService {
       final review = await _reviewFinalAnswerWithGemini(q, requestedScope, answer, ranked, history);
       if (review.isMatch) {
         await _saveHistory(q, answer, 'local_sources_explained');
-        return LegalAiResult(answer: answer, sources: ranked.map(LegalAiSource.fromMadda).toList(), conversationId: conversationId, responseSource: 'local_sources_explained');
+        return LegalAiResult(answer: answer, sources: const [], conversationId: conversationId, responseSource: 'local_sources_explained');
       }
       const retry = 'حاول مرة أخرى.';
       await _saveHistory(q, retry, 'answer_review_failed');
