@@ -1,0 +1,111 @@
+name: Deploy Cloudflare Legal AI
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-cloudflare-legal-ai
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      REINDEX_TOKEN: ${{ secrets.REINDEX_TOKEN }}
+      LEGAL_AI_BASE_URL: ${{ vars.LEGAL_AI_BASE_URL || 'https://odd-mouse-c1e0.ghgfcrcgrf57566.workers.dev' }}
+    steps:
+      - name: Validate required secrets
+        run: |
+          set -e
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Missing CLOUDFLARE_ACCOUNT_ID secret"; exit 1; }
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing CLOUDFLARE_API_TOKEN secret"; exit 1; }
+          test -n "$GEMINI_API_KEY" || { echo "Missing GEMINI_API_KEY secret"; exit 1; }
+          test -n "$REINDEX_TOKEN" || { echo "Missing REINDEX_TOKEN secret"; exit 1; }
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install document conversion tool
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc
+
+      - name: Build canonical local law database
+        working-directory: yemen_laws_app
+        run: |
+          set -e
+          git show cc0321e0118f9afdec3812b4df30d5d5dcc4e118:yemen_laws_app/assets/db/app_database.db > /tmp/yemen_laws_base.db
+          python3 tools/build_db.py \
+            --src "$GITHUB_WORKSPACE" \
+            --base-db /tmp/yemen_laws_base.db \
+            --out assets/db/app_database.db
+          python3 - <<'PY'
+          import sqlite3
+          db=sqlite3.connect("assets/db/app_database.db")
+          for table in ("laws","abwab","fusul","mawad"):
+              count=db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+              print(f"{table}: {count}")
+              if table in ("laws","mawad") and count == 0:
+                  raise SystemExit(f"Canonical table {table} is empty")
+          db.close()
+          PY
+
+      - name: Install backend dependencies
+        working-directory: backend/legal-ai
+        run: npm install --no-audit --no-fund
+
+      - name: Type-check Cloudflare Worker
+        working-directory: backend/legal-ai
+        run: npm run typecheck
+
+      - name: Apply D1 schema
+        working-directory: backend/legal-ai
+        run: npx wrangler d1 execute yemen_laws_db --remote --file=./schema.sql
+
+      - name: Export canonical laws and seed D1
+        working-directory: backend/legal-ai
+        run: |
+          set -e
+          mkdir -p data/generated
+          python3 ../../yemen_laws_app/tools/export_rag_data.py \
+            --db ../../yemen_laws_app/assets/db/app_database.db \
+            --out ./data/generated
+          npx wrangler d1 execute yemen_laws_db --remote --file=./data/generated/seed.sql
+
+      - name: Configure Worker secrets
+        working-directory: backend/legal-ai
+        run: |
+          set -e
+          printf '%s' "$GEMINI_API_KEY" | npx wrangler secret put GEMINI_API_KEY
+          printf '%s' "$REINDEX_TOKEN" | npx wrangler secret put REINDEX_TOKEN
+
+      - name: Deploy Worker
+        working-directory: backend/legal-ai
+        run: npx wrangler deploy
+
+      - name: Rebuild semantic index
+        working-directory: backend/legal-ai
+        run: bash ./scripts/reindex.sh
+
+      - name: Smoke-test legal assistant API
+        working-directory: backend/legal-ai
+        run: bash ./scripts/test-endpoints.sh
