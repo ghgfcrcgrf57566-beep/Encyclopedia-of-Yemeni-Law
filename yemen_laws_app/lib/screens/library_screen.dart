@@ -682,8 +682,8 @@ class _CategoryScreen extends StatelessWidget {
     required this.sharia, required this.onDownload, required this.onPause, required this.downloaded, required this.progress, required this.onInfo,
   });
 
-  List<Map<String, dynamic>> _itemsFor(String category) => items.where((e) =>
-      (sharia ? _shariaCategoryLocal(e) : _legalCategoryLocal(e)) == category).toList();
+  List<Map<String, dynamic>> _itemsFor(String category) =>
+      items.where((item) => categoryOf(item) == category).toList();
 
   String _text(Map<String, dynamic> e) => [e['title'], e['author'], e['category'], e['description'], e['full_summary']].join(' ').toLowerCase();
   bool _isSanhouri(Map<String, dynamic> e) => _text(e).contains('السنهوري') || _text(e).contains('سنهوري');
