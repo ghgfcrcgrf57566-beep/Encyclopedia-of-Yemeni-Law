@@ -115,7 +115,7 @@ class _SearchScreenState extends State<SearchScreen> {
               child: SizedBox(
                 width: double.infinity,
                 child: DropdownButtonFormField<int?>(
-                  value: _selectedLawId,
+                  value: _laws.any((law) => law.id == _selectedLawId) ? _selectedLawId : null,
                   isExpanded: true,
                   decoration: InputDecoration(
                     prefixIcon: Icon(Icons.filter_list, color: context.textSecondary),
