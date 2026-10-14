@@ -9,7 +9,8 @@ import '../law_detail/widgets/section_tile.dart';
 import '../article/article_detail_screen.dart';
 
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key});
+  final int? initialLawId;
+  const SearchScreen({super.key, this.initialLawId});
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -30,12 +31,19 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedLawId = widget.initialLawId;
     _loadLaws();
   }
 
   Future<void> _loadLaws() async {
     final laws = await _repo.getAllLaws();
-    setState(() => _laws = laws);
+    if (!mounted) return;
+    setState(() {
+      _laws = laws;
+      if (_selectedLawId != null && !laws.any((law) => law.id == _selectedLawId)) {
+        _selectedLawId = null;
+      }
+    });
   }
 
   void _onChanged(String value) {
