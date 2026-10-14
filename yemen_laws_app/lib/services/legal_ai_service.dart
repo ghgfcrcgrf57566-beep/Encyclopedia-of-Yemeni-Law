@@ -179,7 +179,14 @@ class LegalAiService {
 
   String _extractLawScope(String raw) {
     final match = RegExp(r'نطاق البحث الإلزامي:\s*(.+?)\s*فقط').firstMatch(raw);
-    if (match != null && match.group(1)?.trim().isNotEmpty == true) return match.group(1)!.trim();
+    if (match != null && match.group(1)?.trim().isNotEmpty == true) {
+      // واجهة المساعد ترسل النطاق بصيغة "ابحث في القانون المدني فقط".
+      // احذف فعل التوجيه قبل مطابقة اسم القانون في قاعدة SQLite.
+      return match.group(1)!.trim().replaceFirst(
+        RegExp(r'^(?:ابحث|فتش|ابحث\s+ضمن)\s+في\s+', caseSensitive: false),
+        '',
+      ).trim();
+    }
     return 'الكل';
   }
 
