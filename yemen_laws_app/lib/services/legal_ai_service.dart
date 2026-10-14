@@ -352,7 +352,7 @@ match=true فقط إذا كانت الإجابة مرتبطة مباشرة با�
 
   Future<String> _callGemini(String prompt, {List<Map<String, String>> history = const [], double temperature = 0.0}) async {
     final model = AppConfig.geminiModel.trim().isEmpty ? 'gemini-3.5-flash-lite' : AppConfig.geminiModel.trim();
-    final uri = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=${Uri.encodeQueryComponent(AppConfig.geminiApiKey.trim())}');
+    final uri = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent');
     final contents = <Map<String, dynamic>>[];
     for (final item in history.take(8)) {
       final role = item['role'] == 'assistant' ? 'model' : 'user';
@@ -361,7 +361,10 @@ match=true فقط إذا كانت الإجابة مرتبطة مباشرة با�
     }
     contents.add({'role': 'user', 'parts': [{'text': prompt}]});
 
-    final response = await http.post(uri, headers: {'Content-Type': 'application/json'}, body: jsonEncode({
+    final response = await http.post(uri, headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': AppConfig.geminiApiKey.trim(),
+    }, body: jsonEncode({
       'contents': contents,
       'generationConfig': {'temperature': temperature, 'responseMimeType': 'text/plain'},
     })).timeout(const Duration(seconds: 45));
