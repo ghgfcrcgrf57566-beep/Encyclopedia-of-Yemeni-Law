@@ -15,33 +15,33 @@ const kLegalReferencesMergedIndexUrl =
     'https://raw.githubusercontent.com/ghgfcrcgrf57566-beep/Encyclopedia-of-Yemeni-Law/main/legal_references/merged_books.json';
 
 const _legalCategories = <_LibraryCategory>[
-  _LibraryCategory('الشروح والموسوعات', Icons.menu_book_rounded),
-  _LibraryCategory('القانون المدني', Icons.account_balance_wallet_rounded),
+  _LibraryCategory('الشروح والموسوعات', Icons.library_books_rounded),
+  _LibraryCategory('القانون المدني', Icons.balance_rounded),
   _LibraryCategory('القانون الجنائي والإجراءات الجزائية', Icons.gavel_rounded),
-  _LibraryCategory('القانون التجاري والشركات', Icons.business_rounded),
+  _LibraryCategory('القانون التجاري والشركات', Icons.business_center_rounded),
   _LibraryCategory('القانون الدستوري والإداري', Icons.account_balance_rounded),
   _LibraryCategory('القانون الدولي والمقارن', Icons.public_rounded),
   _LibraryCategory('الأحوال الشخصية', Icons.family_restroom_rounded),
-  _LibraryCategory('قانون العمل', Icons.engineering_rounded),
+  _LibraryCategory('قانون العمل', Icons.work_outline_rounded),
   _LibraryCategory('العقارات والإيجارات', Icons.home_work_rounded),
   _LibraryCategory('الإجراءات والإثبات والتحكيم', Icons.fact_check_rounded),
   _LibraryCategory('القوانين المهنية والصحية', Icons.medical_services_rounded),
-  _LibraryCategory('المعاجم والمداخل القانونية', Icons.menu_book_rounded),
+  _LibraryCategory('المعاجم والمداخل القانونية', Icons.text_fields_rounded),
 ];
 
 const _shariaCategories = <_LibraryCategory>[
-  _LibraryCategory('الفقه الزيدي', Icons.menu_book_rounded),
-  _LibraryCategory('الفقه الشافعي', Icons.menu_book_rounded),
-  _LibraryCategory('الفقه الحنفي', Icons.menu_book_rounded),
-  _LibraryCategory('الفقه المالكي', Icons.menu_book_rounded),
-  _LibraryCategory('الفقه الحنبلي', Icons.menu_book_rounded),
-  _LibraryCategory('الفقه الإمامي', Icons.menu_book_rounded),
+  _LibraryCategory('الفقه الزيدي', Icons.auto_stories_rounded),
+  _LibraryCategory('الفقه الشافعي', Icons.school_rounded),
+  _LibraryCategory('الفقه الحنفي', Icons.history_edu_rounded),
+  _LibraryCategory('الفقه المالكي', Icons.library_books_rounded),
+  _LibraryCategory('الفقه الحنبلي', Icons.bookmark_added_rounded),
+  _LibraryCategory('الفقه الإمامي', Icons.account_balance_rounded),
   _LibraryCategory('الفقه المقارن', Icons.compare_arrows_rounded),
   _LibraryCategory('أصول الفقه', Icons.account_tree_rounded),
   _LibraryCategory('الفرائض والمواريث', Icons.calculate_rounded),
-  _LibraryCategory('الحديث والفقه', Icons.auto_stories_rounded),
-  _LibraryCategory('الشروح والحواشي', Icons.library_books_rounded),
-  _LibraryCategory('الفتاوى', Icons.question_answer_rounded),
+  _LibraryCategory('الحديث والفقه', Icons.format_quote_rounded),
+  _LibraryCategory('الشروح والحواشي', Icons.menu_book_rounded),
+  _LibraryCategory('الفتاوى', Icons.support_agent_rounded),
   _LibraryCategory('فقه المعاملات', Icons.handshake_rounded),
 ];
 
@@ -64,6 +64,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
   final Set<String> _favorites = {};
   final Set<String> _reading = {};
   Set<String> _downloaded = {};
+  final _librarySearchController = TextEditingController();
+  String _libraryQuery = '';
   bool _loading = true;
 
   @override
@@ -72,6 +74,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   @override
   void dispose() {
     for (final token in _tokens.values) token.cancel('library_disposed');
+    _librarySearchController.dispose();
     _dio.close(force: true);
     super.dispose();
   }
@@ -92,6 +95,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
   String _text(Map<String, dynamic> item) => [
     item['title'], item['author'], item['category'], item['description'], item['full_summary']
   ].join(' ').toLowerCase();
+
+  String _normalizeLibrarySearch(String value) => value
+      .toLowerCase()
+      .replaceAll(RegExp(r'[ً-ٟ]'), '')
+      .replaceAll(RegExp(r'[إأآٱ]'), 'ا')
+      .replaceAll('ى', 'ي')
+      .replaceAll('ة', 'ه')
+      .replaceAll('ـ', '')
+      .trim();
 
   bool _isSupremeCourt(Map<String, dynamic> item) {
     final id = (item['id'] ?? '').toString().toLowerCase();
@@ -433,6 +445,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
     const black = Color(0xFF12070A);
     const gold = Color(0xFFD4AF37);
     const goldLight = Color(0xFFF4D982);
+    final normalizedQuery = _normalizeLibrarySearch(_libraryQuery);
+    final searchResults = normalizedQuery.isEmpty
+        ? <Map<String, dynamic>>[]
+        : (_libraryItems.where((item) => _normalizeLibrarySearch(_text(item)).contains(normalizedQuery)).toList()
+          ..sort((a, b) => (a['title'] ?? '').toString().compareTo((b['title'] ?? '').toString())));
 
     return Scaffold(
       backgroundColor: black,
@@ -512,8 +529,62 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       ),
                     ),
                   ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                    child: TextField(
+                      controller: _librarySearchController,
+                      textDirection: TextDirection.rtl,
+                      textInputAction: TextInputAction.search,
+                      onChanged: (value) => setState(() => _libraryQuery = value),
+                      decoration: InputDecoration(
+                        hintText: 'ابحث في جميع كتب المكتبة...',
+                        prefixIcon: const Icon(Icons.search_rounded, color: gold),
+                        suffixIcon: _libraryQuery.isEmpty ? null : IconButton(
+                          tooltip: 'مسح البحث',
+                          icon: const Icon(Icons.close_rounded, color: gold),
+                          onPressed: () {
+                            _librarySearchController.clear();
+                            setState(() => _libraryQuery = '');
+                          },
+                        ),
+                        isDense: true,
+                        filled: true,
+                        fillColor: const Color(0xFF2A1119),
+                        hintStyle: const TextStyle(color: Color(0xFFBDAEB0)),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0x66D4AF37))),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0x66D4AF37))),
+                      ),
+                    ),
+                  ),
                   Expanded(
-                    child: LayoutBuilder(
+                    child: _libraryQuery.trim().isNotEmpty
+                        ? (searchResults.isEmpty
+                            ? const Center(child: Text('لا توجد كتب مطابقة للبحث', style: TextStyle(color: Color(0xFFD5C9C9))))
+                            : ListView.separated(
+                                padding: const EdgeInsets.fromLTRB(14, 6, 14, 24),
+                                itemCount: searchResults.length,
+                                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                                itemBuilder: (context, index) {
+                                  final item = searchResults[index];
+                                  final sharia = _isSharia(item);
+                                  final category = sharia ? _shariaCategory(item) : _legalCategory(item);
+                                  return Container(
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xCC241019),
+                                      borderRadius: BorderRadius.circular(15),
+                                      border: Border.all(color: const Color(0x66D4AF37)),
+                                    ),
+                                    child: ListTile(
+                                      onTap: () => _showInfo(item),
+                                      leading: Icon(sharia ? Icons.menu_book_rounded : Icons.balance_rounded, color: gold, size: 27),
+                                      title: Text((item['title'] ?? 'كتاب دون عنوان').toString(), textAlign: TextAlign.right, style: const TextStyle(color: Color(0xFFFFE8B2), fontWeight: FontWeight.w800)),
+                                      subtitle: Text('${sharia ? 'المكتبة الشرعية' : 'المكتبة القانونية'} • $category • ${(item['author'] ?? 'المؤلف غير محدد').toString()}', textAlign: TextAlign.right, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFFD5C9C9), fontSize: 11.5)),
+                                      trailing: const Icon(Icons.chevron_left_rounded, color: gold),
+                                    ),
+                                  );
+                                },
+                              ))
+                        : LayoutBuilder(
                       builder: (context, constraints) {
                         final width = MediaQuery.sizeOf(context).width;
                         final compact = width < 360;
