@@ -183,7 +183,7 @@ class LegalAiService {
       // واجهة المساعد ترسل النطاق بصيغة "ابحث في القانون المدني فقط".
       // احذف فعل التوجيه قبل مطابقة اسم القانون في قاعدة SQLite.
       return match.group(1)!.trim().replaceFirst(
-        RegExp(r'^(?:ابحث|فتش|ابحث\s+ضمن)\s+في\s+', caseSensitive: false),
+        RegExp(r'^(?:ابحث|فتش)\s+في\s+', caseSensitive: false),
         '',
       ).trim();
     }
