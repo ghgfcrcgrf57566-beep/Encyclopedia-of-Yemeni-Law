@@ -54,17 +54,10 @@ class LegalAiService {
     // نفصل السؤال الحقيقي والنطاق هنا حتى لا تدخل تعليمات الواجهة في بحث SQLite.
     final q = _extractUserQuestion(raw);
 
-    // Use the deployed legal RAG service first. It searches the canonical D1
-    // corpus and returns the matched legal articles with the answer.
-    final remoteResult = await _askRemote(
-      question: q,
-      conversationId: conversationId,
-      history: history,
-    );
-    if (remoteResult != null) {
-      await _saveHistory(q, remoteResult.answer, remoteResult.responseSource);
-      return remoteResult;
-    }
+    // نستخدم Gemini API مباشرة من التطبيق كما في المسار السابق، بعد فصل
+    // السؤال ونطاق القانون. لا نعتمد على عنوان Worker/Cloudflare قديم أو معطل.
+    // تبقى قاعدة SQLite هي المصدر الأول، ويُستخدم Gemini لتخطيط البحث والشرح
+    // وترتيب المواد المحلية، ولا تُرسل مواد قانونية من قانون آخر عند تحديد النطاق.
 
     final inferredScope = _extractLawScope(raw);
     final explicitScope = _inferLawScope(q);
