@@ -172,13 +172,16 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   String _legalCategory(Map<String, dynamic> item) {
+    // اجمع مجلدات السنهوري في التصنيف المخصص للشروح والموسوعات حتى
+    // لا تتوزع أجزاؤه على المدني والإيجارات والبيع وغيرها من الأقسام.
+    if (_isSanhouri(item)) return 'الشروح والموسوعات';
     final explicit = (item['category'] ?? '').toString().trim();
     const known = _legalCategories;
     for (final category in known) {
       if (explicit == category.title) return category.title;
     }
     final text = _text(item);
-    if (_isSanhouri(item) || text.contains('شرح') || text.contains('موسوعة') || text.contains('حاشية')) return 'الشروح والموسوعات';
+    if (text.contains('شرح') || text.contains('موسوعة') || text.contains('حاشية')) return 'الشروح والموسوعات';
     if (text.contains('قاموس') || text.contains('معجم') || text.contains('مصطلحات القانون')) return 'المعاجم والمداخل القانونية';
     if (text.contains('دولي') || text.contains('مقارن') || text.contains('تنازع القوانين')) return 'القانون الدولي والمقارن';
     if (text.contains('أحوال شخصية') || text.contains('الزواج') || text.contains('الطلاق') || text.contains('الأسرة')) return 'الأحوال الشخصية';
