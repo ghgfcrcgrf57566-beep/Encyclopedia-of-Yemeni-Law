@@ -52,7 +52,7 @@ class LibraryScreen extends StatefulWidget {
 }
 
 class _LibraryScreenState extends State<LibraryScreen> {
-  static const _cacheKey = 'cached_legal_references_json_v14';
+  static const _cacheKey = 'cached_legal_references_json_v15';
   final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 15),
     receiveTimeout: const Duration(seconds: 90),
@@ -1165,7 +1165,7 @@ class _BookDetailsScreen extends StatelessWidget {
                 OutlinedButton.icon(
                   onPressed: () => _openExternalLink(context, bookLink),
                   icon: const Icon(Icons.open_in_new_rounded, color: Color(0xFFD4AF37)),
-                  label: Text(sourceUrl.isNotEmpty ? 'صفحة المصدر' : 'البحث عن الكتاب'),
+                  label: Text(sourceUrl.isNotEmpty && !sourceUrl.contains('books.google.com/books?q=') ? 'صفحة المصدر' : 'البحث عن الكتاب'),
                 ),
               if (downloaded)
                 OutlinedButton.icon(
@@ -1287,7 +1287,7 @@ class _ResolvedBookCoverState extends State<_ResolvedBookCover> {
 
   Future<String?> _googleBooksCover(String title, String author) async {
     try {
-      final query = 'intitle:$title' + (author.isEmpty ? '' : '+inauthor:$author');
+      final query = 'intitle:$title' + (author.isEmpty ? '' : ' inauthor:$author');
       final response = await _coverDio.get<dynamic>(
         'https://www.googleapis.com/books/v1/volumes',
         queryParameters: {'q': query, 'maxResults': 5, 'printType': 'books'},
