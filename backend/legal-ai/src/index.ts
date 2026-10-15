@@ -153,8 +153,12 @@ async function handleChat(request: Request, env: Env): Promise<Response> {
         : crypto.randomUUID();
 
     const maxResults = Math.min(Math.max(Number(env.MAX_RESULTS || 8), 1), 12);
+    // Resolve elliptical follow-up questions against the active conversation before
+    // retrieving legal articles (e.g. "وما شروطه؟" after asking about divorce).
+    // Use prior user questions for retrieval context, not prior AI answers as legal evidence.
+    const retrievalQuery = buildRetrievalQuery(question, history);
     const sources = await retrieveLegalSources(
-      question,
+      retrievalQuery,
       env,
       maxResults,
     );
@@ -421,6 +425,23 @@ ${row.article_text}`,
     next_after: nextAfter,
     processed: vectors.length,
   });
+}
+
+function buildRetrievalQuery(question: string, history: HistoryMessage[]): string {
+  const current = question.trim();
+  if (!history.length) return current;
+
+  const priorUserQuestions = history
+    .filter((message) => message.role === "user")
+    .map((message) => message.content.trim())
+    .filter(Boolean)
+    .slice(-2);
+
+  if (!priorUserQuestions.length) return current;
+
+  // Keep the latest question intact and add only enough prior user context
+  // to resolve pronouns and short follow-ups without flooding lexical search.
+  return [...priorUserQuestions, current].join("\\n");
 }
 
 function normalizeHistory(value: unknown): HistoryMessage[] {
