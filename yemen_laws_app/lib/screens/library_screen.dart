@@ -321,12 +321,18 @@ class _LibraryScreenState extends State<LibraryScreen> {
     }
     final pdfUrl = (item['pdf_url'] ?? item['download_url'] ?? '').toString().trim();
     final sourceUrl = (item['source_url'] ?? '').toString().trim();
+    final searchUrl = (item['search_url'] ?? '').toString().trim();
+    final pageUrl = sourceUrl.isNotEmpty ? sourceUrl : searchUrl;
     if (pdfUrl.isEmpty) {
-      if (sourceUrl.isEmpty) {
-        _message('النسخة الرقمية غير متوفرة حاليًا لهذا الكتاب.');
+      if (pageUrl.isEmpty) {
+        _message('لم نعثر على رابط مباشر أو صفحة بحث لهذا الكتاب حتى الآن.');
       } else {
-        final ok = await launchUrl(Uri.parse(sourceUrl), mode: LaunchMode.externalApplication);
-        if (!ok && mounted) _message('تعذر فتح مصدر الكتاب.');
+        try {
+          final ok = await launchUrl(Uri.parse(pageUrl), mode: LaunchMode.externalApplication);
+          if (!ok && mounted) _message('تعذر فتح صفحة الكتاب.');
+        } catch (_) {
+          if (mounted) _message('تعذر فتح صفحة الكتاب.');
+        }
       }
       return;
     }
@@ -1084,10 +1090,35 @@ class _BookDetailsScreen extends StatelessWidget {
     return v.isEmpty ? 'غير متوفر' : v;
   }
 
+  bool _hasValue(String key) => (item[key] ?? '').toString().trim().isNotEmpty;
+
+  Future<void> _openExternalLink(BuildContext context, String url) async {
+    final uri = Uri.tryParse(url.trim());
+    if (uri == null || !uri.hasScheme) return;
+    try {
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!opened && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تعذر فتح الرابط.')),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تعذر فتح الرابط.')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cover = (item['cover_url'] ?? item['cover_image_url'] ?? '').toString().trim();
     final pdf = (item['pdf_url'] ?? item['download_url'] ?? '').toString().trim();
+    final sourceUrl = (item['source_url'] ?? '').toString().trim();
+    final searchUrl = (item['search_url'] ?? '').toString().trim();
+    final bookLink = sourceUrl.isNotEmpty ? sourceUrl : searchUrl;
+    final isSharia = (item['section'] ?? '').toString().trim().toLowerCase() == 'sharia';
     final summary = (item['full_summary'] ?? item['description'] ?? '').toString().trim();
     return Scaffold(
       backgroundColor: const Color(0xFF120D09),
@@ -1130,6 +1161,12 @@ class _BookDetailsScreen extends StatelessWidget {
                 icon: Icon(favorite ? Icons.star_rounded : Icons.star_border_rounded, color: const Color(0xFFD4AF37)),
                 label: const Text('المفضلة'),
               ),
+              if (bookLink.isNotEmpty)
+                OutlinedButton.icon(
+                  onPressed: () => _openExternalLink(context, bookLink),
+                  icon: const Icon(Icons.open_in_new_rounded, color: Color(0xFFD4AF37)),
+                  label: Text(sourceUrl.isNotEmpty ? 'صفحة المصدر' : 'البحث عن الكتاب'),
+                ),
               if (downloaded)
                 OutlinedButton.icon(
                   onPressed: onOpen,
@@ -1160,13 +1197,14 @@ class _BookDetailsScreen extends StatelessWidget {
           _DetailSection('بيانات الكتاب', [
             _DetailRow('العنوان', _value('title')),
             _DetailRow('المؤلف', _value('author')),
-            _DetailRow('سنة الوفاة', _value('author_death_year')),
-            _DetailRow('الناشر', _value('publisher')),
-            _DetailRow('الطبعة', _value('edition')),
-            _DetailRow('عدد الصفحات', _value('pages_count')),
-            _DetailRow('مطابقة المطبوع', _value('print_matching')),
-            _DetailRow('الحجم', _value('file_size')),
-            _DetailRow('تاريخ الإضافة', _value('date_added')),
+            if (_hasValue('category')) _DetailRow('التصنيف', _value('category')),
+            if (_hasValue('publisher')) _DetailRow('الناشر', _value('publisher')),
+            if (_hasValue('pages_count')) _DetailRow('عدد الصفحات', _value('pages_count')),
+            if (_hasValue('file_size')) _DetailRow('الحجم', _value('file_size')),
+            if (!isSharia && _hasValue('author_death_year')) _DetailRow('سنة الوفاة', _value('author_death_year')),
+            if (!isSharia && _hasValue('edition')) _DetailRow('الطبعة', _value('edition')),
+            if (!isSharia && _hasValue('print_matching')) _DetailRow('مطابقة المطبوع', _value('print_matching')),
+            if (!isSharia && _hasValue('date_added')) _DetailRow('تاريخ الإضافة', _value('date_added')),
           ]),
           if (summary.isNotEmpty) ...[
             const SizedBox(height: 14),
@@ -1247,6 +1285,51 @@ class _ResolvedBookCoverState extends State<_ResolvedBookCover> {
       .trim()
       .replaceAll(RegExp(r'\s+'), ' ');
 
+  Future<String?> _googleBooksCover(String title, String author) async {
+    try {
+      final query = 'intitle:$title' + (author.isEmpty ? '' : '+inauthor:$author');
+      final response = await _coverDio.get<dynamic>(
+        'https://www.googleapis.com/books/v1/volumes',
+        queryParameters: {'q': query, 'maxResults': 5, 'printType': 'books'},
+      );
+      final data = response.data;
+      final items = data is Map ? data['items'] : null;
+      final wantedTitle = _normalize(title);
+      final wantedAuthor = _normalize(author);
+      if (items is! List) return null;
+      for (final entry in items) {
+        if (entry is! Map) continue;
+        final info = entry['volumeInfo'];
+        if (info is! Map) continue;
+        final foundTitle = _normalize((info['title'] ?? '').toString());
+        // Exact title match keeps us from displaying an unrelated book's cover.
+        if (foundTitle != wantedTitle) continue;
+        final authors = info['authors'];
+        if (wantedAuthor.isNotEmpty && authors is List && authors.isNotEmpty) {
+          final authorMatch = authors.any((candidate) {
+            final foundAuthor = _normalize(candidate.toString());
+            return foundAuthor == wantedAuthor ||
+                foundAuthor.contains(wantedAuthor) ||
+                wantedAuthor.contains(foundAuthor);
+          });
+          if (!authorMatch) continue;
+        }
+        final imageLinks = info['imageLinks'];
+        if (imageLinks is! Map) continue;
+        final raw = (imageLinks['thumbnail'] ??
+                imageLinks['medium'] ??
+                imageLinks['smallThumbnail'] ??
+                imageLinks['small'] ??
+                '').toString().trim();
+        if (raw.isEmpty) continue;
+        return raw.replaceFirst(RegExp(r'^http:'), 'https:').replaceAll('&amp;', '&');
+      }
+    } catch (_) {
+      // Continue to Open Library when Google Books has no match or is unavailable.
+    }
+    return null;
+  }
+
   Future<String?> _resolve() async {
     final provided = widget.suppliedUrl.trim();
     if (provided.startsWith('https://') || provided.startsWith('http://')) {
@@ -1269,27 +1352,32 @@ class _ResolvedBookCoverState extends State<_ResolvedBookCover> {
             await Future<void>.delayed(const Duration(seconds: 1) - elapsed);
           }
           _lastRequestAt = DateTime.now();
-          final response = await _coverDio.get<dynamic>(
-            'https://openlibrary.org/search.json',
-            queryParameters: {
-              'title': title,
-              'fields': 'title,cover_i',
-              'limit': 5,
-            },
+          String? result = await _googleBooksCover(
+            title,
+            (widget.item['author'] ?? '').toString().trim(),
           );
-          final data = response.data;
-          final docs = data is Map ? data['docs'] : null;
-          String? result;
-          if (docs is List) {
-            final wanted = _normalize(title);
-            for (final doc in docs) {
-              if (doc is! Map) continue;
-              final foundTitle = _normalize((doc['title'] ?? '').toString());
-              final coverId = doc['cover_i'];
-              // لا نعرض غلافًا إلا عند تطابق العنوان بعد تطبيع اختلافات الكتابة العربية.
-              if (foundTitle == wanted && coverId != null) {
-                result = 'https://covers.openlibrary.org/b/id/$coverId-M.jpg';
-                break;
+          if (result == null) {
+            final response = await _coverDio.get<dynamic>(
+              'https://openlibrary.org/search.json',
+              queryParameters: {
+                'title': title,
+                'fields': 'title,cover_i',
+                'limit': 5,
+              },
+            );
+            final data = response.data;
+            final docs = data is Map ? data['docs'] : null;
+            if (docs is List) {
+              final wanted = _normalize(title);
+              for (final doc in docs) {
+                if (doc is! Map) continue;
+                final foundTitle = _normalize((doc['title'] ?? '').toString());
+                final coverId = doc['cover_i'];
+                // لا نعرض غلافًا إلا عند تطابق العنوان بعد تطبيع اختلافات الكتابة العربية.
+                if (foundTitle == wanted && coverId != null) {
+                  result = 'https://covers.openlibrary.org/b/id/$coverId-M.jpg';
+                  break;
+                }
               }
             }
           }
