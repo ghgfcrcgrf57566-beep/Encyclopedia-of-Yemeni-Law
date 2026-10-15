@@ -15,33 +15,33 @@ const kLegalReferencesMergedIndexUrl =
     'https://raw.githubusercontent.com/ghgfcrcgrf57566-beep/Encyclopedia-of-Yemeni-Law/main/legal_references/merged_books.json';
 
 const _legalCategories = <_LibraryCategory>[
-  _LibraryCategory('الشروح والموسوعات', Icons.menu_book_rounded),
-  _LibraryCategory('القانون المدني', Icons.account_balance_wallet_rounded),
+  _LibraryCategory('الشروح والموسوعات', Icons.library_books_rounded),
+  _LibraryCategory('القانون المدني', Icons.balance_rounded),
   _LibraryCategory('القانون الجنائي والإجراءات الجزائية', Icons.gavel_rounded),
-  _LibraryCategory('القانون التجاري والشركات', Icons.business_rounded),
+  _LibraryCategory('القانون التجاري والشركات', Icons.business_center_rounded),
   _LibraryCategory('القانون الدستوري والإداري', Icons.account_balance_rounded),
   _LibraryCategory('القانون الدولي والمقارن', Icons.public_rounded),
   _LibraryCategory('الأحوال الشخصية', Icons.family_restroom_rounded),
-  _LibraryCategory('قانون العمل', Icons.engineering_rounded),
+  _LibraryCategory('قانون العمل', Icons.work_outline_rounded),
   _LibraryCategory('العقارات والإيجارات', Icons.home_work_rounded),
   _LibraryCategory('الإجراءات والإثبات والتحكيم', Icons.fact_check_rounded),
   _LibraryCategory('القوانين المهنية والصحية', Icons.medical_services_rounded),
-  _LibraryCategory('المعاجم والمداخل القانونية', Icons.menu_book_rounded),
+  _LibraryCategory('المعاجم والمداخل القانونية', Icons.text_fields_rounded),
 ];
 
 const _shariaCategories = <_LibraryCategory>[
-  _LibraryCategory('الفقه الزيدي', Icons.menu_book_rounded),
-  _LibraryCategory('الفقه الشافعي', Icons.menu_book_rounded),
-  _LibraryCategory('الفقه الحنفي', Icons.menu_book_rounded),
-  _LibraryCategory('الفقه المالكي', Icons.menu_book_rounded),
-  _LibraryCategory('الفقه الحنبلي', Icons.menu_book_rounded),
-  _LibraryCategory('الفقه الإمامي', Icons.menu_book_rounded),
+  _LibraryCategory('الفقه الزيدي', Icons.auto_stories_rounded),
+  _LibraryCategory('الفقه الشافعي', Icons.school_rounded),
+  _LibraryCategory('الفقه الحنفي', Icons.history_edu_rounded),
+  _LibraryCategory('الفقه المالكي', Icons.library_books_rounded),
+  _LibraryCategory('الفقه الحنبلي', Icons.bookmark_added_rounded),
+  _LibraryCategory('الفقه الإمامي', Icons.account_balance_rounded),
   _LibraryCategory('الفقه المقارن', Icons.compare_arrows_rounded),
   _LibraryCategory('أصول الفقه', Icons.account_tree_rounded),
   _LibraryCategory('الفرائض والمواريث', Icons.calculate_rounded),
-  _LibraryCategory('الحديث والفقه', Icons.auto_stories_rounded),
-  _LibraryCategory('الشروح والحواشي', Icons.library_books_rounded),
-  _LibraryCategory('الفتاوى', Icons.question_answer_rounded),
+  _LibraryCategory('الحديث والفقه', Icons.format_quote_rounded),
+  _LibraryCategory('الشروح والحواشي', Icons.menu_book_rounded),
+  _LibraryCategory('الفتاوى', Icons.support_agent_rounded),
   _LibraryCategory('فقه المعاملات', Icons.handshake_rounded),
 ];
 
@@ -52,7 +52,7 @@ class LibraryScreen extends StatefulWidget {
 }
 
 class _LibraryScreenState extends State<LibraryScreen> {
-  static const _cacheKey = 'cached_legal_references_json_v14';
+  static const _cacheKey = 'cached_legal_references_json_v15';
   final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 15),
     receiveTimeout: const Duration(seconds: 90),
@@ -64,6 +64,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
   final Set<String> _favorites = {};
   final Set<String> _reading = {};
   Set<String> _downloaded = {};
+  final _librarySearchController = TextEditingController();
+  String _libraryQuery = '';
   bool _loading = true;
 
   @override
@@ -72,6 +74,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   @override
   void dispose() {
     for (final token in _tokens.values) token.cancel('library_disposed');
+    _librarySearchController.dispose();
     _dio.close(force: true);
     super.dispose();
   }
@@ -92,6 +95,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
   String _text(Map<String, dynamic> item) => [
     item['title'], item['author'], item['category'], item['description'], item['full_summary']
   ].join(' ').toLowerCase();
+
+  String _normalizeLibrarySearch(String value) => value
+      .toLowerCase()
+      .replaceAll(RegExp(r'[ً-ٟ]'), '')
+      .replaceAll(RegExp(r'[إأآٱ]'), 'ا')
+      .replaceAll('ى', 'ي')
+      .replaceAll('ة', 'ه')
+      .replaceAll('ـ', '')
+      .trim();
 
   bool _isSupremeCourt(Map<String, dynamic> item) {
     final id = (item['id'] ?? '').toString().toLowerCase();
@@ -160,13 +172,16 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   String _legalCategory(Map<String, dynamic> item) {
+    // اجمع مجلدات السنهوري في التصنيف المخصص للشروح والموسوعات حتى
+    // لا تتوزع أجزاؤه على المدني والإيجارات والبيع وغيرها من الأقسام.
+    if (_isSanhouri(item)) return 'الشروح والموسوعات';
     final explicit = (item['category'] ?? '').toString().trim();
     const known = _legalCategories;
     for (final category in known) {
       if (explicit == category.title) return category.title;
     }
     final text = _text(item);
-    if (_isSanhouri(item) || text.contains('شرح') || text.contains('موسوعة') || text.contains('حاشية')) return 'الشروح والموسوعات';
+    if (text.contains('شرح') || text.contains('موسوعة') || text.contains('حاشية')) return 'الشروح والموسوعات';
     if (text.contains('قاموس') || text.contains('معجم') || text.contains('مصطلحات القانون')) return 'المعاجم والمداخل القانونية';
     if (text.contains('دولي') || text.contains('مقارن') || text.contains('تنازع القوانين')) return 'القانون الدولي والمقارن';
     if (text.contains('أحوال شخصية') || text.contains('الزواج') || text.contains('الطلاق') || text.contains('الأسرة')) return 'الأحوال الشخصية';
@@ -306,12 +321,18 @@ class _LibraryScreenState extends State<LibraryScreen> {
     }
     final pdfUrl = (item['pdf_url'] ?? item['download_url'] ?? '').toString().trim();
     final sourceUrl = (item['source_url'] ?? '').toString().trim();
+    final searchUrl = (item['search_url'] ?? '').toString().trim();
+    final pageUrl = sourceUrl.isNotEmpty ? sourceUrl : searchUrl;
     if (pdfUrl.isEmpty) {
-      if (sourceUrl.isEmpty) {
-        _message('النسخة الرقمية غير متوفرة حاليًا لهذا الكتاب.');
+      if (pageUrl.isEmpty) {
+        _message('لم نعثر على رابط مباشر أو صفحة بحث لهذا الكتاب حتى الآن.');
       } else {
-        final ok = await launchUrl(Uri.parse(sourceUrl), mode: LaunchMode.externalApplication);
-        if (!ok && mounted) _message('تعذر فتح مصدر الكتاب.');
+        try {
+          final ok = await launchUrl(Uri.parse(pageUrl), mode: LaunchMode.externalApplication);
+          if (!ok && mounted) _message('تعذر فتح صفحة الكتاب.');
+        } catch (_) {
+          if (mounted) _message('تعذر فتح صفحة الكتاب.');
+        }
       }
       return;
     }
@@ -433,6 +454,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
     const black = Color(0xFF12070A);
     const gold = Color(0xFFD4AF37);
     const goldLight = Color(0xFFF4D982);
+    final normalizedQuery = _normalizeLibrarySearch(_libraryQuery);
+    final searchResults = normalizedQuery.isEmpty
+        ? <Map<String, dynamic>>[]
+        : (_libraryItems.where((item) => _normalizeLibrarySearch(_text(item)).contains(normalizedQuery)).toList()
+          ..sort((a, b) => (a['title'] ?? '').toString().compareTo((b['title'] ?? '').toString())));
 
     return Scaffold(
       backgroundColor: black,
@@ -512,8 +538,62 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       ),
                     ),
                   ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                    child: TextField(
+                      controller: _librarySearchController,
+                      textDirection: TextDirection.rtl,
+                      textInputAction: TextInputAction.search,
+                      onChanged: (value) => setState(() => _libraryQuery = value),
+                      decoration: InputDecoration(
+                        hintText: 'ابحث في جميع كتب المكتبة...',
+                        prefixIcon: const Icon(Icons.search_rounded, color: gold),
+                        suffixIcon: _libraryQuery.isEmpty ? null : IconButton(
+                          tooltip: 'مسح البحث',
+                          icon: const Icon(Icons.close_rounded, color: gold),
+                          onPressed: () {
+                            _librarySearchController.clear();
+                            setState(() => _libraryQuery = '');
+                          },
+                        ),
+                        isDense: true,
+                        filled: true,
+                        fillColor: const Color(0xFF2A1119),
+                        hintStyle: const TextStyle(color: Color(0xFFBDAEB0)),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0x66D4AF37))),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0x66D4AF37))),
+                      ),
+                    ),
+                  ),
                   Expanded(
-                    child: LayoutBuilder(
+                    child: _libraryQuery.trim().isNotEmpty
+                        ? (searchResults.isEmpty
+                            ? const Center(child: Text('لا توجد كتب مطابقة للبحث', style: TextStyle(color: Color(0xFFD5C9C9))))
+                            : ListView.separated(
+                                padding: const EdgeInsets.fromLTRB(14, 6, 14, 24),
+                                itemCount: searchResults.length,
+                                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                                itemBuilder: (context, index) {
+                                  final item = searchResults[index];
+                                  final sharia = _isSharia(item);
+                                  final category = sharia ? _shariaCategory(item) : _legalCategory(item);
+                                  return Container(
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xCC241019),
+                                      borderRadius: BorderRadius.circular(15),
+                                      border: Border.all(color: const Color(0x66D4AF37)),
+                                    ),
+                                    child: ListTile(
+                                      onTap: () => _showInfo(item),
+                                      leading: Icon(sharia ? Icons.menu_book_rounded : Icons.balance_rounded, color: gold, size: 27),
+                                      title: Text((item['title'] ?? 'كتاب دون عنوان').toString(), textAlign: TextAlign.right, style: const TextStyle(color: Color(0xFFFFE8B2), fontWeight: FontWeight.w800)),
+                                      subtitle: Text('${sharia ? 'المكتبة الشرعية' : 'المكتبة القانونية'} • $category • ${(item['author'] ?? 'المؤلف غير محدد').toString()}', textAlign: TextAlign.right, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFFD5C9C9), fontSize: 11.5)),
+                                      trailing: const Icon(Icons.chevron_left_rounded, color: gold),
+                                    ),
+                                  );
+                                },
+                              ))
+                        : LayoutBuilder(
                       builder: (context, constraints) {
                         final width = MediaQuery.sizeOf(context).width;
                         final compact = width < 360;
@@ -608,8 +688,8 @@ class _CategoryScreen extends StatelessWidget {
     required this.sharia, required this.onDownload, required this.onPause, required this.downloaded, required this.progress, required this.onInfo,
   });
 
-  List<Map<String, dynamic>> _itemsFor(String category) => items.where((e) =>
-      (sharia ? _shariaCategoryLocal(e) : _legalCategoryLocal(e)) == category).toList();
+  List<Map<String, dynamic>> _itemsFor(String category) =>
+      items.where((item) => categoryOf(item) == category).toList();
 
   String _text(Map<String, dynamic> e) => [e['title'], e['author'], e['category'], e['description'], e['full_summary']].join(' ').toLowerCase();
   bool _isSanhouri(Map<String, dynamic> e) => _text(e).contains('السنهوري') || _text(e).contains('سنهوري');
@@ -1010,10 +1090,35 @@ class _BookDetailsScreen extends StatelessWidget {
     return v.isEmpty ? 'غير متوفر' : v;
   }
 
+  bool _hasValue(String key) => (item[key] ?? '').toString().trim().isNotEmpty;
+
+  Future<void> _openExternalLink(BuildContext context, String url) async {
+    final uri = Uri.tryParse(url.trim());
+    if (uri == null || !uri.hasScheme) return;
+    try {
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!opened && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تعذر فتح الرابط.')),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تعذر فتح الرابط.')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cover = (item['cover_url'] ?? item['cover_image_url'] ?? '').toString().trim();
     final pdf = (item['pdf_url'] ?? item['download_url'] ?? '').toString().trim();
+    final sourceUrl = (item['source_url'] ?? '').toString().trim();
+    final searchUrl = (item['search_url'] ?? '').toString().trim();
+    final bookLink = sourceUrl.isNotEmpty ? sourceUrl : searchUrl;
+    final isSharia = (item['section'] ?? '').toString().trim().toLowerCase() == 'sharia';
     final summary = (item['full_summary'] ?? item['description'] ?? '').toString().trim();
     return Scaffold(
       backgroundColor: const Color(0xFF120D09),
@@ -1056,6 +1161,12 @@ class _BookDetailsScreen extends StatelessWidget {
                 icon: Icon(favorite ? Icons.star_rounded : Icons.star_border_rounded, color: const Color(0xFFD4AF37)),
                 label: const Text('المفضلة'),
               ),
+              if (bookLink.isNotEmpty)
+                OutlinedButton.icon(
+                  onPressed: () => _openExternalLink(context, bookLink),
+                  icon: const Icon(Icons.open_in_new_rounded, color: Color(0xFFD4AF37)),
+                  label: Text(sourceUrl.isNotEmpty && !sourceUrl.contains('books.google.com/books?q=') ? 'صفحة المصدر' : 'البحث عن الكتاب'),
+                ),
               if (downloaded)
                 OutlinedButton.icon(
                   onPressed: onOpen,
@@ -1086,13 +1197,18 @@ class _BookDetailsScreen extends StatelessWidget {
           _DetailSection('بيانات الكتاب', [
             _DetailRow('العنوان', _value('title')),
             _DetailRow('المؤلف', _value('author')),
-            _DetailRow('سنة الوفاة', _value('author_death_year')),
-            _DetailRow('الناشر', _value('publisher')),
-            _DetailRow('الطبعة', _value('edition')),
-            _DetailRow('عدد الصفحات', _value('pages_count')),
-            _DetailRow('مطابقة المطبوع', _value('print_matching')),
-            _DetailRow('الحجم', _value('file_size')),
-            _DetailRow('تاريخ الإضافة', _value('date_added')),
+            if (_hasValue('category')) _DetailRow('التصنيف', _value('category')),
+            if (_hasValue('publisher')) _DetailRow('الناشر', _value('publisher')),
+            if (_hasValue('editor')) _DetailRow('المحقق', _value('editor')),
+            if (_hasValue('place_of_publication')) _DetailRow('مكان النشر', _value('place_of_publication')),
+            if (_hasValue('publication_year')) _DetailRow('سنة النشر', _value('publication_year')),
+            if (_hasValue('pages_count')) _DetailRow('عدد الصفحات', _value('pages_count')),
+            if (_hasValue('volumes_count')) _DetailRow('عدد المجلدات', _value('volumes_count')),
+            if (_hasValue('file_size')) _DetailRow('الحجم', _value('file_size')),
+            if (!isSharia && _hasValue('author_death_year')) _DetailRow('سنة الوفاة', _value('author_death_year')),
+            if (!isSharia && _hasValue('edition')) _DetailRow('الطبعة', _value('edition')),
+            if (!isSharia && _hasValue('print_matching')) _DetailRow('مطابقة المطبوع', _value('print_matching')),
+            if (!isSharia && _hasValue('date_added')) _DetailRow('تاريخ الإضافة', _value('date_added')),
           ]),
           if (summary.isNotEmpty) ...[
             const SizedBox(height: 14),
@@ -1173,6 +1289,51 @@ class _ResolvedBookCoverState extends State<_ResolvedBookCover> {
       .trim()
       .replaceAll(RegExp(r'\s+'), ' ');
 
+  Future<String?> _googleBooksCover(String title, String author) async {
+    try {
+      final query = 'intitle:$title' + (author.isEmpty ? '' : ' inauthor:$author');
+      final response = await _coverDio.get<dynamic>(
+        'https://www.googleapis.com/books/v1/volumes',
+        queryParameters: {'q': query, 'maxResults': 5, 'printType': 'books'},
+      );
+      final data = response.data;
+      final items = data is Map ? data['items'] : null;
+      final wantedTitle = _normalize(title);
+      final wantedAuthor = _normalize(author);
+      if (items is! List) return null;
+      for (final entry in items) {
+        if (entry is! Map) continue;
+        final info = entry['volumeInfo'];
+        if (info is! Map) continue;
+        final foundTitle = _normalize((info['title'] ?? '').toString());
+        // Exact title match keeps us from displaying an unrelated book's cover.
+        if (foundTitle != wantedTitle) continue;
+        final authors = info['authors'];
+        if (wantedAuthor.isNotEmpty && authors is List && authors.isNotEmpty) {
+          final authorMatch = authors.any((candidate) {
+            final foundAuthor = _normalize(candidate.toString());
+            return foundAuthor == wantedAuthor ||
+                foundAuthor.contains(wantedAuthor) ||
+                wantedAuthor.contains(foundAuthor);
+          });
+          if (!authorMatch) continue;
+        }
+        final imageLinks = info['imageLinks'];
+        if (imageLinks is! Map) continue;
+        final raw = (imageLinks['thumbnail'] ??
+                imageLinks['medium'] ??
+                imageLinks['smallThumbnail'] ??
+                imageLinks['small'] ??
+                '').toString().trim();
+        if (raw.isEmpty) continue;
+        return raw.replaceFirst(RegExp(r'^http:'), 'https:').replaceAll('&amp;', '&');
+      }
+    } catch (_) {
+      // Continue to Open Library when Google Books has no match or is unavailable.
+    }
+    return null;
+  }
+
   Future<String?> _resolve() async {
     final provided = widget.suppliedUrl.trim();
     if (provided.startsWith('https://') || provided.startsWith('http://')) {
@@ -1195,27 +1356,32 @@ class _ResolvedBookCoverState extends State<_ResolvedBookCover> {
             await Future<void>.delayed(const Duration(seconds: 1) - elapsed);
           }
           _lastRequestAt = DateTime.now();
-          final response = await _coverDio.get<dynamic>(
-            'https://openlibrary.org/search.json',
-            queryParameters: {
-              'title': title,
-              'fields': 'title,cover_i',
-              'limit': 5,
-            },
+          String? result = await _googleBooksCover(
+            title,
+            (widget.item['author'] ?? '').toString().trim(),
           );
-          final data = response.data;
-          final docs = data is Map ? data['docs'] : null;
-          String? result;
-          if (docs is List) {
-            final wanted = _normalize(title);
-            for (final doc in docs) {
-              if (doc is! Map) continue;
-              final foundTitle = _normalize((doc['title'] ?? '').toString());
-              final coverId = doc['cover_i'];
-              // لا نعرض غلافًا إلا عند تطابق العنوان بعد تطبيع اختلافات الكتابة العربية.
-              if (foundTitle == wanted && coverId != null) {
-                result = 'https://covers.openlibrary.org/b/id/$coverId-M.jpg';
-                break;
+          if (result == null) {
+            final response = await _coverDio.get<dynamic>(
+              'https://openlibrary.org/search.json',
+              queryParameters: {
+                'title': title,
+                'fields': 'title,cover_i',
+                'limit': 5,
+              },
+            );
+            final data = response.data;
+            final docs = data is Map ? data['docs'] : null;
+            if (docs is List) {
+              final wanted = _normalize(title);
+              for (final doc in docs) {
+                if (doc is! Map) continue;
+                final foundTitle = _normalize((doc['title'] ?? '').toString());
+                final coverId = doc['cover_i'];
+                // لا نعرض غلافًا إلا عند تطابق العنوان بعد تطبيع اختلافات الكتابة العربية.
+                if (foundTitle == wanted && coverId != null) {
+                  result = 'https://covers.openlibrary.org/b/id/$coverId-M.jpg';
+                  break;
+                }
               }
             }
           }
