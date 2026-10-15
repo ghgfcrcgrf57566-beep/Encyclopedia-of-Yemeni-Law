@@ -7,7 +7,6 @@ import 'package:provider/provider.dart';
 import '../core/constants.dart';
 import '../core/theme.dart';
 import '../providers/settings_provider.dart';
-import 'coming_soon_screen.dart';
 import 'contact/contact_screen.dart';
 import 'favorites/favorites_screen.dart';
 import 'feedback/feedback_screen.dart';
@@ -16,6 +15,7 @@ import 'laws/laws_home_screen.dart';
 import 'supreme_court_screen.dart';
 import 'library_screen.dart';
 import 'legal_ai/legal_ai_screen.dart';
+import 'legal_tools_screen.dart';
 
 class RootShell extends StatelessWidget {
   const RootShell({super.key});
@@ -24,7 +24,7 @@ class RootShell extends StatelessWidget {
         _SectionData(icon: Icons.auto_awesome_rounded, title: 'اسأل موسوعة القوانين اليمنية', subtitle: 'مساعد ذكي يبحث أولاً في نصوص القوانين', builder: (_) => const LegalAiScreen(), fullWidth: true),
         _SectionData(icon: Icons.menu_book_rounded, title: 'المكتبة', subtitle: 'المكتبة القانونية والمكتبة الشرعية', builder: (_) => const LibraryScreen()),
         _SectionData(icon: Icons.balance_rounded, title: 'القوانين اليمنية', subtitle: 'نصوص القوانين والمواد', builder: (_) => const LawsHomeScreen()),
-        _SectionData(icon: Icons.description_rounded, title: 'المذكرات والنماذج القانونية', subtitle: 'صحائف وعقود وإنذارات ونماذج', builder: (_) => const ComingSoonScreen(title: 'المذكرات والنماذج القانونية')),
+        _SectionData(icon: Icons.gavel_rounded, title: 'الأدوات القانونية', subtitle: 'الحاسبات والإجراءات وإدارة القضايا', builder: (_) => const LegalToolsScreen()),
         _SectionData(icon: Icons.account_balance_rounded, title: 'أحكام المحكمة العليا', subtitle: 'القواعد والمبادئ والأحكام القضائية', builder: (_) => const SupremeCourtScreen()),
         _SectionData(icon: Icons.calculate_rounded, title: 'حاسبة المواريث والتركات', subtitle: 'حساب الأنصبة والحجب والعول والرد', builder: (_) => const InheritanceCalculatorScreen()),
         _SectionData(icon: Icons.star_rounded, title: 'المفضلة', subtitle: 'المواد والعناصر المحفوظة', builder: (_) => const FavoritesScreen()),
@@ -57,17 +57,17 @@ class RootShell extends StatelessWidget {
           statusBarColor: Colors.transparent,
           statusBarIconBrightness: context.isDark ? Brightness.light : Brightness.dark,
           statusBarBrightness: context.isDark ? Brightness.dark : Brightness.light,
-          systemNavigationBarColor: Colors.black,
+          systemNavigationBarColor: context.isDark ? AppColors.darkBackground : AppColors.lightBackground,
           systemNavigationBarIconBrightness: context.isDark ? Brightness.light : Brightness.dark,
         ),
         child: Scaffold(
-          backgroundColor: Colors.black,
+          backgroundColor: context.isDark ? AppColors.darkBackground : AppColors.lightBackground,
           body: Stack(fit: StackFit.expand, children: [
             ColorFiltered(
-              colorFilter: const ColorFilter.mode(Colors.transparent, BlendMode.dst),
+              colorFilter: context.isDark ? const ColorFilter.mode(Colors.transparent, BlendMode.dst) : ColorFilter.mode(Colors.white.withOpacity(.72), BlendMode.screen),
               child: const _LibraryBackground(),
             ),
-            const ColoredBox(color: Colors.black),
+            Container(color: context.isDark ? const Color(0x8F120A06) : const Color(0x331A1208)),
             SafeArea(
               child: LayoutBuilder(builder: (context, constraints) {
                 final horizontalPadding = constraints.maxWidth >= 700 ? 26.0 : 12.0;
@@ -245,12 +245,12 @@ class _LibraryPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
-    canvas.drawRect(rect, Paint()..color = Colors.black);
-    final shelfPaint = Paint()..color = Colors.transparent;
+    canvas.drawRect(rect, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF5A3219), Color(0xFF24150D), Color(0xFF100A07)]).createShader(rect));
+    final shelfPaint = Paint()..color = const Color(0x663C2110);
     for (double y = size.height * .17; y < size.height; y += 150) {
       canvas.drawRect(Rect.fromLTWH(0, y, size.width, 9), shelfPaint);
     }
-    final bookColors = [Colors.transparent, Colors.transparent, Colors.transparent, Colors.transparent];
+    final bookColors = [const Color(0x663F2715), const Color(0x664F3219), const Color(0x665E3C1D), const Color(0x66352619)];
     var seed = 7;
     for (double y = size.height * .02; y < size.height; y += 150) {
       var x = -20.0;
