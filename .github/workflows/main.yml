@@ -3,6 +3,8 @@ name: Build Flutter APK
 on:
   push:
     branches: [ main ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
 permissions:
@@ -96,8 +98,36 @@ jobs:
       - name: Run Flutter tests
         run: flutter test
 
+      - name: Configure Android release signing from GitHub Secrets
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -e
+          test -n "$ANDROID_KEYSTORE_BASE64" || { echo "::error::Missing ANDROID_KEYSTORE_BASE64 secret"; exit 1; }
+          test -n "$ANDROID_KEYSTORE_PASSWORD" || { echo "::error::Missing ANDROID_KEYSTORE_PASSWORD secret"; exit 1; }
+          test -n "$ANDROID_KEY_ALIAS" || { echo "::error::Missing ANDROID_KEY_ALIAS secret"; exit 1; }
+          test -n "$ANDROID_KEY_PASSWORD" || { echo "::error::Missing ANDROID_KEY_PASSWORD secret"; exit 1; }
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/upload-keystore.jks
+          test -s android/upload-keystore.jks
+          cat > android/key.properties <<EOF
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyPassword=$ANDROID_KEY_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          storeFile=../upload-keystore.jks
+          EOF
+          echo "Release signing configured."
+
       - name: Build release APK
         run: flutter build apk --release --dart-define=LEGAL_AI_BASE_URL=https://odd-mouse-c1e0.ghgfcrcgrf57566.workers.dev --dart-define=APP_VERSION=1.0.0
+
+      - name: Build signed Play Store AAB
+        run: |
+          set -e
+          flutter build appbundle --release --dart-define=LEGAL_AI_BASE_URL=https://odd-mouse-c1e0.ghgfcrcgrf57566.workers.dev --dart-define=APP_VERSION=1.0.0
+          test -s build/app/outputs/bundle/release/app-release.aab
 
       - name: Check if Supreme Court PDF release exists
         env:
@@ -145,4 +175,11 @@ jobs:
         with:
           name: yemen-law-apk
           path: yemen_laws_app/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+
+      - name: Upload signed Play Store AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: yemen-law-play-store-aab
+          path: yemen_laws_app/build/app/outputs/bundle/release/app-release.aab
           if-no-files-found: error
