@@ -6,7 +6,7 @@ import '../../core/constants.dart';
 import '../../core/theme.dart';
 
 const _contactGold = Color(0xFFD4AF37);
-const _contactPanel = Color(0xFF1A1A1A);
+const _contactPanel = Color(0xFF080808);
 const _contactWhatsApp = Color(0xFF25D366);
 const _contactFacebook = Color(0xFF1877F2);
 
@@ -50,7 +50,7 @@ class ContactScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF121212),
+      backgroundColor: Colors.black,
       appBar: AppBar(
         title: const Text('التواصل والاستشارات'),
         centerTitle: true,
@@ -134,7 +134,7 @@ class ContactScreen extends StatelessWidget {
                       width: double.infinity,
                       padding: const EdgeInsetsDirectional.fromSTEB(8, 6, 8, 6),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF101010),
+                        color: Colors.black,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(color: _contactGold.withOpacity(0.38)),
                       ),
@@ -194,7 +194,7 @@ class ContactScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF181512),
+                  color: const Color(0xFF050505),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: const Color(0x554A3B27)),
                 ),
