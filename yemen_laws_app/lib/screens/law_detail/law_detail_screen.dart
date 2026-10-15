@@ -7,6 +7,7 @@ import '../../data/models/madda.dart';
 import '../../data/repositories/laws_repository.dart';
 import '../article/article_list_screen.dart';
 import '../article/article_detail_screen.dart';
+import '../search/search_screen.dart';
 import 'widgets/section_tile.dart';
 import 'sequential_law_screen.dart';
 
@@ -72,6 +73,13 @@ class _LawDetailScreenState extends State<LawDetailScreen> {
       appBar: AppBar(
         title: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.search_rounded),
+            tooltip: 'بحث داخل هذا القانون',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => SearchScreen(initialLawId: widget.law.id)),
+            ),
+          ),
           if (isRoot)
             IconButton(
               icon: const Icon(Icons.menu_book_outlined),
