@@ -4353,7 +4353,12 @@
     "description": "مرجع إضافي في المكتبة للبحث والدراسة القانونية والفقهية.",
     "full_summary": "أضيف إلى الفهرس الموضوعي للمكتبة مع تصنيفه بحسب مجاله العلمي. النسخة الرقمية تضاف عند توفر مصدر موثوق.",
     "access": "catalog_only",
-    "search_url": "https://books.google.com/books?q=%D8%A7%D9%84%D8%AF%D8%B1%20%D8%A7%D9%84%D9%85%D8%AE%D8%AA%D8%A7%D8%B1%20%D8%B4%D8%B1%D8%AD%20%D8%AA%D9%86%D9%88%D9%8A%D8%B1%20%D8%A7%D9%84%D8%A3%D8%A8%D8%B5%D8%A7%D8%B1%20%D8%A7%D9%84%D8%AD%D8%B5%D9%83%D9%81%D9%8A"
+    "source_url": "https://waqfeya.net/books/%D8%A7%D9%84%D8%AF%D8%B1-%D8%A7%D9%84%D9%85%D8%AE%D8%AA%D8%A7%D8%B1-%D8%B4%D8%B1%D8%AD-%D8%AA%D9%86%D9%88%D9%8A%D8%B1-%D8%A7%D9%84%D8%A3%D8%A8%D8%B5%D8%A7%D8%B1-%D9%88%D8%AC%D8%A7%D9%85%D8%B9-%D8%A7%D9%84%D8%A8%D8%AD%D8%A7%D8%B1/a332ea0df24644e7bb2eb4b6708e73cb",
+    "editor": "عبد المنعم خليل إبراهيم",
+    "publisher": "دار الكتب العلمية",
+    "publication_year": "1423 هـ / 2002 م",
+    "pages_count": 782,
+    "volumes_count": 1
   },
   {
     "id": "catalog_166",
@@ -4364,7 +4369,11 @@
     "description": "مرجع إضافي في المكتبة للبحث والدراسة القانونية والفقهية.",
     "full_summary": "أضيف إلى الفهرس الموضوعي للمكتبة مع تصنيفه بحسب مجاله العلمي. النسخة الرقمية تضاف عند توفر مصدر موثوق.",
     "access": "catalog_only",
-    "search_url": "https://books.google.com/books?q=%D8%AA%D8%A8%D9%8A%D9%8A%D9%86%20%D8%A7%D9%84%D8%AD%D9%82%D8%A7%D8%A6%D9%82%20%D8%B4%D8%B1%D8%AD%20%D9%83%D9%86%D8%B2%20%D8%A7%D9%84%D8%AF%D9%82%D8%A7%D8%A6%D9%82%20%D8%A7%D9%84%D8%B2%D9%8A%D9%84%D8%B9%D9%8A"
+    "source_url": "https://waqfeya.net/books/%D8%AA%D8%A8%D9%8A%D9%8A%D9%86-%D8%A7%D9%84%D8%AD%D9%82%D8%A7%D8%A6%D9%82-%D8%B4%D8%B1%D8%AD-%D9%83%D9%86%D8%B2-%D8%A7%D9%84%D8%AF%D9%82%D8%A7%D8%A6%D9%82-%D9%88%D8%A8%D9%87%D8%A7%D9%85%D8%B4%D9%87-%D8%AD%D8%A7%D8%B4%D9%8A%D8%A9-%D8%A7%D9%84%D8%B4%D9%84%D8%A8%D9%8A/63474419f9bf4cdebfe7037f2766535a",
+    "publisher": "المطبعة الأميرية الكبرى ببولاق",
+    "publication_year": "1314 هـ",
+    "pages_count": 1854,
+    "volumes_count": 6
   },
   {
     "id": "catalog_167",
@@ -4516,7 +4525,12 @@
     "description": "مرجع إضافي في المكتبة للبحث والدراسة القانونية والفقهية.",
     "full_summary": "أضيف إلى الفهرس الموضوعي للمكتبة مع تصنيفه بحسب مجاله العلمي. النسخة الرقمية تضاف عند توفر مصدر موثوق.",
     "access": "catalog_only",
-    "search_url": "https://books.google.com/books?q=%D8%AA%D9%82%D9%88%D9%8A%D9%85%20%D8%A7%D9%84%D8%A3%D8%AF%D9%84%D8%A9%20%D9%81%D9%8A%20%D8%A3%D8%B5%D9%88%D9%84%20%D8%A7%D9%84%D9%81%D9%82%D9%87%20%D8%A7%D9%84%D8%AF%D8%A8%D9%88%D8%B3%D9%8A"
+    "source_url": "https://waqfeya.net/books/%D8%AA%D9%82%D9%88%D9%8A%D9%85-%D8%A7%D9%84%D8%A3%D8%AF%D9%84%D8%A9-%D9%81%D9%8A-%D8%A3%D8%B5%D9%88%D9%84-%D8%A7%D9%84%D9%81%D9%82%D9%87-%D8%B7-%D8%A7%D9%84%D8%B9%D9%84%D9%85%D9%8A%D8%A9-f523833f8d36450b85c8f80ddaa1a315",
+    "editor": "خليل محيي الدين الميس",
+    "publisher": "دار الكتب العلمية",
+    "publication_year": "1421 هـ / 2001 م",
+    "pages_count": 472,
+    "volumes_count": 1
   },
   {
     "id": "catalog_178",
