@@ -196,7 +196,7 @@ class LegalAiService {
           'message': question,
           'conversation_id': conversationId,
           'language': 'ar',
-          'history': history.take(8).map((item) => {
+          'history': history.take(12).map((item) => {
             'role': item['role'] == 'assistant' ? 'assistant' : 'user',
             'content': item['content'] ?? '',
           }).toList(),
@@ -435,7 +435,7 @@ match=true فقط إذا كانت الإجابة مرتبطة مباشرة با�
     final model = AppConfig.geminiModel.trim().isEmpty ? 'gemini-3.5-flash-lite' : AppConfig.geminiModel.trim();
     final uri = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=${Uri.encodeQueryComponent(AppConfig.geminiApiKey.trim())}');
     final contents = <Map<String, dynamic>>[];
-    for (final item in history.take(8)) {
+    for (final item in history.take(12)) {
       final role = item['role'] == 'assistant' ? 'model' : 'user';
       final text = item['content']?.trim() ?? '';
       if (text.isNotEmpty) contents.add({'role': role, 'parts': [{'text': text}]});
