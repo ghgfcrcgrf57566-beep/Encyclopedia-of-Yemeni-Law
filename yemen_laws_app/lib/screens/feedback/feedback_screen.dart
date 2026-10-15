@@ -127,7 +127,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
             ),
             const SizedBox(height: 14),
             Text(
-              'يمكنك حفظ ملاحظة أو اقتراح على جهازك. الحفظ لا يرسل الملاحظة إلى المطوّر. لإرسال بلاغ فعلي، استخدم قسم البلاغ عبر البريد أدناه.',
+              AppConstants.feedbackIntro,
               textAlign: TextAlign.right,
               style: TextStyle(fontSize: 13.5, height: 1.7, color: context.textSecondary),
             ),
