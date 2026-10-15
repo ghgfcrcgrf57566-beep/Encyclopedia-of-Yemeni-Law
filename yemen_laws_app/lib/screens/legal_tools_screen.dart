@@ -108,6 +108,7 @@ class _LegalCalculatorScreenState extends State<LegalCalculatorScreen> {
   void _dateCalc() {
     final number = int.tryParse(_days.text.trim());
     if (number == null || number < 1 || number > 36500) {
+      setState(() => _dateResult = null);
       _message('أدخل عدد أيام صحيحًا بين 1 و36500.');
       return;
     }
@@ -118,10 +119,12 @@ class _LegalCalculatorScreenState extends State<LegalCalculatorScreen> {
     final amount = double.tryParse(_amount.text.trim().replaceAll(',', ''));
     final rate = double.tryParse(_rate.text.trim().replaceAll(',', ''));
     if (amount == null || !amount.isFinite || amount < 0) {
+      setState(() => _percentResult = null);
       _message('أدخل مبلغًا أساسيًا صحيحًا غير سالب.');
       return;
     }
     if (rate == null || !rate.isFinite || rate < 0 || rate > 100000) {
+      setState(() => _percentResult = null);
       _message('أدخل نسبة صحيحة غير سالبة.');
       return;
     }
@@ -154,7 +157,7 @@ class _LegalCalculatorScreenState extends State<LegalCalculatorScreen> {
       style: OutlinedButton.styleFrom(foregroundColor: goldLight, side: const BorderSide(color: line), padding: const EdgeInsets.symmetric(vertical: 13))),
     const SizedBox(height: 12),
     const _Label('عدد الأيام'),
-    TextField(controller: _days, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: 'مثال: 15', suffixIcon: Icon(Icons.numbers_rounded))),
+    TextField(controller: _days, keyboardType: TextInputType.number, onChanged: (_) => setState(() => _dateResult = null), decoration: const InputDecoration(hintText: 'مثال: 15', suffixIcon: Icon(Icons.numbers_rounded))),
     SwitchListTile(
       contentPadding: EdgeInsets.zero, activeColor: gold, value: _includeStart,
       onChanged: (v) => setState(() { _includeStart = v; _dateResult = null; }),
@@ -170,10 +173,10 @@ class _LegalCalculatorScreenState extends State<LegalCalculatorScreen> {
 
   Widget _amountForm() => _FormPanel(title: 'حساب نسبة من مبلغ', description: 'الأداة لا تقترح نسبًا نظامية؛ أدخل النسبة بعد التحقق من مصدرها.', children: [
     const _Label('المبلغ الأساسي'),
-    TextField(controller: _amount, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(hintText: '0.00', suffixIcon: Icon(Icons.account_balance_wallet_outlined))),
+    TextField(controller: _amount, keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: (_) => setState(() => _percentResult = null), decoration: const InputDecoration(hintText: '0.00', suffixIcon: Icon(Icons.account_balance_wallet_outlined))),
     const SizedBox(height: 12),
     const _Label('النسبة المئوية المعتمدة لديك'),
-    TextField(controller: _rate, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(hintText: 'مثال: 5', suffixIcon: Icon(Icons.percent_rounded))),
+    TextField(controller: _rate, keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: (_) => setState(() => _percentResult = null), decoration: const InputDecoration(hintText: 'مثال: 5', suffixIcon: Icon(Icons.percent_rounded))),
     const SizedBox(height: 12),
     const _Label('مصدر النسبة: القانون ورقم المادة'),
     TextField(controller: _source, maxLines: 2, decoration: const InputDecoration(hintText: 'اسم القانون / المادة / إصدار النص', suffixIcon: Icon(Icons.menu_book_rounded))),
