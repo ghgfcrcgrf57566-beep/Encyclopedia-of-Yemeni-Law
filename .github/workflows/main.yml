@@ -1,4 +1,4 @@
-name: Build Flutter APK
+name: Build Flutter APK and Play Store AAB
 
 on:
   push:
@@ -12,7 +12,7 @@ permissions:
 
 # لا نسمح بتراكم تشغيلات بناء قديمة؛ آخر push هو الذي يجب أن يُبنى.
 concurrency:
-  group: flutter-apk-${{ github.ref }}
+  group: flutter-android-release-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -98,6 +98,29 @@ jobs:
       - name: Run Flutter tests
         run: flutter test
 
+      - name: Configure release signing from GitHub Secrets
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -e
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && [ -n "$ANDROID_KEY_ALIAS" ] && [ -n "$ANDROID_KEY_PASSWORD" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/upload-keystore.jks
+            cat > android/key.properties <<EOF
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyPassword=$ANDROID_KEY_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          storeFile=upload-keystore.jks
+          EOF
+            echo "RELEASE_SIGNING_CONFIGURED=true" >> "$GITHUB_ENV"
+            echo "Release signing credentials are configured."
+          else
+            echo "RELEASE_SIGNING_CONFIGURED=false" >> "$GITHUB_ENV"
+            echo "::warning::Release AAB will not be produced: configure all four Android signing secrets first. No debug-signed bundle will be presented as Play Store-ready."
+          fi
+
       - name: Build release APK
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -106,6 +129,15 @@ jobs:
             echo "::warning::GEMINI_API_KEY repository secret is empty; the APK will use local-search fallback only."
           fi
           flutter build apk --release --dart-define=GEMINI_API_KEY="$GEMINI_API_KEY" --dart-define=APP_VERSION=1.0.0
+
+      - name: Build signed Play Store AAB
+        if: env.RELEASE_SIGNING_CONFIGURED == 'true'
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          set -e
+          flutter build appbundle --release --dart-define=GEMINI_API_KEY="$GEMINI_API_KEY" --dart-define=APP_VERSION=1.0.0
+          test -s build/app/outputs/bundle/release/app-release.aab
 
       - name: Check if Supreme Court PDF release exists
         env:
@@ -153,4 +185,12 @@ jobs:
         with:
           name: yemen-law-apk
           path: yemen_laws_app/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+
+      - name: Upload signed AAB artifact
+        if: env.RELEASE_SIGNING_CONFIGURED == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: yemen-law-play-store-aab
+          path: yemen_laws_app/build/app/outputs/bundle/release/app-release.aab
           if-no-files-found: error
