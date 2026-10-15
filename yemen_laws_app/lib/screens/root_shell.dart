@@ -55,19 +55,15 @@ class RootShell extends StatelessWidget {
       child: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
-          statusBarIconBrightness: context.isDark ? Brightness.light : Brightness.dark,
-          statusBarBrightness: context.isDark ? Brightness.dark : Brightness.light,
-          systemNavigationBarColor: context.isDark ? AppColors.darkBackground : AppColors.lightBackground,
-          systemNavigationBarIconBrightness: context.isDark ? Brightness.light : Brightness.dark,
+          statusBarIconBrightness: Brightness.light,
+          statusBarBrightness: Brightness.dark,
+          systemNavigationBarColor: Colors.black,
+          systemNavigationBarIconBrightness: Brightness.light,
         ),
         child: Scaffold(
           backgroundColor: Colors.black,
           body: Stack(fit: StackFit.expand, children: [
-            ColorFiltered(
-              colorFilter: context.isDark ? const ColorFilter.mode(Colors.transparent, BlendMode.dst) : ColorFilter.mode(Colors.white.withOpacity(.72), BlendMode.screen),
-              child: const _LibraryBackground(),
-            ),
-            Container(color: context.isDark ? const Color(0x8F120A06) : const Color(0x331A1208)),
+            const ColoredBox(color: Colors.black),
             SafeArea(
               child: LayoutBuilder(builder: (context, constraints) {
                 final horizontalPadding = constraints.maxWidth >= 700 ? 26.0 : 12.0;
