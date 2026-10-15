@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'legal_sources_screen.dart';
 
 const gold = Color(0xFFD4AF6A);
 const goldLight = Color(0xFFF1D9A0);
@@ -15,6 +16,7 @@ class LegalToolsScreen extends StatelessWidget {
       _Tool(Icons.calendar_month_rounded, 'حاسبة المدد والمبالغ', 'حساب تاريخ بعد مدة أو نسبة من مبلغ، مع توضيح المعادلة.', const LegalCalculatorScreen(), 'حسابات'),
       _Tool(Icons.account_balance_rounded, 'دليل الإجراءات القضائية', 'قوائم تحقق لتنظيم خطوات العمل في ملف الدعوى.', const JudicialProceduresScreen(), 'دليل عملي'),
       _Tool(Icons.folder_special_rounded, 'إدارة القضايا', 'سجل محلي للقضايا والجلسات والملاحظات الخاصة.', const LegalCaseManagerScreen(), 'مساحة شخصية'),
+      _Tool(Icons.fact_check_rounded, 'مصادر القواعد القانونية', 'توثيق مصادر القوانين ومراجعة النص المحلي والتعديلات.', const LegalSourcesScreen(), 'مراجعة وتوثيق'),
     ];
     return Scaffold(
       appBar: AppBar(title: const Text('الأدوات القانونية')),
