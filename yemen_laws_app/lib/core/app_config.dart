@@ -1,6 +1,8 @@
 class AppConfig {
   AppConfig._();
 
+  // Kept for compatibility with older builds; the assistant uses Gemini
+  // directly and does not depend on the legacy Cloudflare Worker URL.
   static const legalAiBaseUrl = String.fromEnvironment(
     'LEGAL_AI_BASE_URL',
     defaultValue: 'https://odd-mouse-c1e0.ghgfcrcgrf57566.workers.dev',
@@ -13,7 +15,7 @@ class AppConfig {
 
   static const geminiModel = String.fromEnvironment(
     'GEMINI_MODEL',
-    defaultValue: 'gemini-3.5-flash-lite',
+    defaultValue: 'gemini-3.8-flash',
   );
 
   static const appVersion = String.fromEnvironment(
