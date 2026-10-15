@@ -5283,5 +5283,17 @@
     "description": "مرجع إضافي في المكتبة للبحث والدراسة القانونية والفقهية.",
     "full_summary": "أضيف إلى الفهرس الموضوعي للمكتبة مع تصنيفه بحسب مجاله العلمي. النسخة الرقمية تضاف عند توفر مصدر موثوق.",
     "access": "catalog_only"
+  },
+  {
+    "id": "ahkam_al_awqaf_edition_2",
+    "title": "كتاب أحكام الأوقاف",
+    "author": "أحمد بن عمر الخصاف",
+    "category": "الفقه الحنفي",
+    "description": "مرجع تراثي متخصص في أحكام الأوقاف، متاح حاليًا للقراءة والتنزيل بصيغة PDF من Arabic Collections Online.",
+    "source": "NYU / American University in Cairo",
+    "source_url": "https://sites.dlib.nyu.edu/viewer/books/auc_aco000146/1?embed=1&lang=ar",
+    "pdf_url": "https://mc.dlib.nyu.edu/files/books/auc_aco000146/auc_aco000146_lo.pdf",
+    "access": "public_domain",
+    "section": "sharia"
   }
 ]
