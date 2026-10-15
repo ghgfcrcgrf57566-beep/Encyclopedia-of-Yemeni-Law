@@ -5181,7 +5181,12 @@
     "description": "مرجع إضافي في المكتبة للبحث والدراسة القانونية والفقهية.",
     "full_summary": "أضيف إلى الفهرس الموضوعي للمكتبة مع تصنيفه بحسب مجاله العلمي. النسخة الرقمية تضاف عند توفر مصدر موثوق.",
     "access": "catalog_only",
-    "search_url": "https://books.google.com/books?q=%D8%A7%D9%84%D8%A8%D8%B1%D9%87%D8%A7%D9%86%20%D9%81%D9%8A%20%D8%A3%D8%B5%D9%88%D9%84%20%D8%A7%D9%84%D9%81%D9%82%D9%87%20%D8%A5%D9%85%D8%A7%D9%85%20%D8%A7%D9%84%D8%AD%D8%B1%D9%85%D9%8A%D9%86%20%D8%A7%D9%84%D8%AC%D9%88%D9%8A%D9%86%D9%8A"
+    "source_url": "https://www.waqfeya.net/books/%D8%A7%D9%84%D8%A8%D8%B1%D9%87%D8%A7%D9%86-%D9%81%D9%8A-%D8%A3%D8%B5%D9%88%D9%84-%D8%A7%D9%84%D9%81%D9%82%D9%87-%D8%AA-%D8%A7%D9%84%D8%AF%D9%8A%D8%A8-f6921ab6ec314520a51a0d62eaa98591",
+    "editor": "عبد العظيم الديب",
+    "publisher": "دولة قطر",
+    "publication_year": "1399 هـ",
+    "pages_count": 1473,
+    "volumes_count": 2
   },
   {
     "id": "catalog_241",
@@ -5340,7 +5345,12 @@
     "description": "مرجع إضافي في المكتبة للبحث والدراسة القانونية والفقهية.",
     "full_summary": "أضيف إلى الفهرس الموضوعي للمكتبة مع تصنيفه بحسب مجاله العلمي. النسخة الرقمية تضاف عند توفر مصدر موثوق.",
     "access": "catalog_only",
-    "search_url": "https://books.google.com/books?q=%D8%B1%D9%88%D8%B6%D8%A9%20%D8%A7%D9%84%D9%86%D8%A7%D8%B8%D8%B1%20%D9%88%D8%AC%D9%86%D8%A9%20%D8%A7%D9%84%D9%85%D9%86%D8%A7%D8%B8%D8%B1%20%D8%A7%D8%A8%D9%86%20%D9%82%D8%AF%D8%A7%D9%85%D8%A9"
+    "source_url": "https://waqfeya.net/books/%D8%B1%D9%88%D8%B6%D8%A9-%D8%A7%D9%84%D9%86%D8%A7%D8%B8%D8%B1-%D9%88%D8%AC%D9%86%D8%A9-%D8%A7%D9%84%D9%85%D9%86%D8%A7%D8%B8%D8%B1-%D8%AA-%D8%A5%D8%B3%D9%85%D8%A7%D8%B9%D9%8A%D9%84/2c64719b82424d6fb02185be007d6832",
+    "editor": "شعبان محمد إسماعيل",
+    "publisher": "مؤسسة الريان - المكتبة التدمرية - المكتبة المكية",
+    "publication_year": 1998,
+    "pages_count": 1090,
+    "volumes_count": 2
   },
   {
     "id": "catalog_255",
@@ -5391,7 +5401,12 @@
     "description": "مرجع إضافي في المكتبة للبحث والدراسة القانونية والفقهية.",
     "full_summary": "أضيف إلى الفهرس الموضوعي للمكتبة مع تصنيفه بحسب مجاله العلمي. النسخة الرقمية تضاف عند توفر مصدر موثوق.",
     "access": "catalog_only",
-    "search_url": "https://books.google.com/books?q=%D8%A7%D9%84%D8%A5%D8%A8%D9%87%D8%A7%D8%AC%20%D9%81%D9%8A%20%D8%B4%D8%B1%D8%AD%20%D8%A7%D9%84%D9%85%D9%86%D9%87%D8%A7%D8%AC%20%D8%A7%D9%84%D8%B3%D8%A8%D9%83%D9%8A"
+    "source_url": "https://waqfeya.net/books/%D8%A7%D9%84%D8%A5%D8%A8%D9%87%D8%A7%D8%AC-%D9%81%D9%8A-%D8%B4%D8%B1%D8%AD-%D8%A7%D9%84%D9%85%D9%86%D9%87%D8%A7%D8%AC-%D8%B4%D8%B1%D8%AD-%D8%B9%D9%84%D9%89-%D9%85%D9%86%D9%87%D8%A7%D8%AC-%D8%A7%D9%84%D9%88%D8%B5%D9%88%D9%84-%D8%A5%D9%84%D9%89-%D8%B9%D9%84%D9%85-%D8%A7%D9%84%D8%A3%D8%B5%D9%88%D9%84-%D9%84%D9%84%D9%82%D8%A7%D8%B6%D9%8A-%D8%A7%D9%84%D8%A8%D9%8A%D8%B6%D8%A7%D9%88%D9%8A-%D8%B7-%D8%AF%D8%A8%D9%8A-ad137ac410d641079a350e2c684b6310",
+    "editor": "أحمد جمال الزمزمي - نور الدين عبد الجبار صغيري",
+    "publisher": "حكومة دبي",
+    "publication_year": 2004,
+    "pages_count": 3709,
+    "volumes_count": 7
   },
   {
     "id": "catalog_260",
