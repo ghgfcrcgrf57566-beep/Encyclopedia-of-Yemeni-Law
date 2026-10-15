@@ -123,7 +123,7 @@ class ContactScreen extends StatelessWidget {
                         ),
                         _SocialContactButton(
                           label: 'فيسبوك',
-                          icon: Icons.facebook_rounded,
+                          icon: Icons.facebook,
                           color: _contactFacebook,
                           onPressed: () => _openExternal(context, 'https://www.facebook.com/AlMqbly'),
                         ),
