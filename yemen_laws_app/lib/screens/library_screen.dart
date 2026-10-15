@@ -9,7 +9,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 const kLegalReferencesMergedIndexUrl =
     'https://raw.githubusercontent.com/ghgfcrcgrf57566-beep/Encyclopedia-of-Yemeni-Law/main/legal_references/merged_books.json';
@@ -320,20 +319,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
       return;
     }
     final pdfUrl = (item['pdf_url'] ?? item['download_url'] ?? '').toString().trim();
-    final sourceUrl = (item['source_url'] ?? '').toString().trim();
-    final searchUrl = (item['search_url'] ?? '').toString().trim();
-    final pageUrl = sourceUrl.isNotEmpty ? sourceUrl : searchUrl;
     if (pdfUrl.isEmpty) {
-      if (pageUrl.isEmpty) {
-        _message('لم نعثر على رابط مباشر أو صفحة بحث لهذا الكتاب حتى الآن.');
-      } else {
-        try {
-          final ok = await launchUrl(Uri.parse(pageUrl), mode: LaunchMode.externalApplication);
-          if (!ok && mounted) _message('تعذر فتح صفحة الكتاب.');
-        } catch (_) {
-          if (mounted) _message('تعذر فتح صفحة الكتاب.');
-        }
-      }
+      _message('لا يتوفر رابط PDF مباشر لهذا الكتاب حاليًا. لم يتم فتح أي موقع خارجي.');
       return;
     }
     final id = (item['id'] ?? item['title'] ?? 'reference').toString();
@@ -1092,32 +1079,10 @@ class _BookDetailsScreen extends StatelessWidget {
 
   bool _hasValue(String key) => (item[key] ?? '').toString().trim().isNotEmpty;
 
-  Future<void> _openExternalLink(BuildContext context, String url) async {
-    final uri = Uri.tryParse(url.trim());
-    if (uri == null || !uri.hasScheme) return;
-    try {
-      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (!opened && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تعذر فتح الرابط.')),
-        );
-      }
-    } catch (_) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تعذر فتح الرابط.')),
-        );
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final cover = (item['cover_url'] ?? item['cover_image_url'] ?? '').toString().trim();
     final pdf = (item['pdf_url'] ?? item['download_url'] ?? '').toString().trim();
-    final sourceUrl = (item['source_url'] ?? '').toString().trim();
-    final searchUrl = (item['search_url'] ?? '').toString().trim();
-    final bookLink = sourceUrl.isNotEmpty ? sourceUrl : searchUrl;
     final isSharia = (item['section'] ?? '').toString().trim().toLowerCase() == 'sharia';
     final summary = (item['full_summary'] ?? item['description'] ?? '').toString().trim();
     return Scaffold(
@@ -1161,23 +1126,17 @@ class _BookDetailsScreen extends StatelessWidget {
                 icon: Icon(favorite ? Icons.star_rounded : Icons.star_border_rounded, color: const Color(0xFFD4AF37)),
                 label: const Text('المفضلة'),
               ),
-              if (bookLink.isNotEmpty)
-                OutlinedButton.icon(
-                  onPressed: () => _openExternalLink(context, bookLink),
-                  icon: const Icon(Icons.open_in_new_rounded, color: Color(0xFFD4AF37)),
-                  label: Text(sourceUrl.isNotEmpty && !sourceUrl.contains('books.google.com/books?q=') ? 'صفحة المصدر' : 'البحث عن الكتاب'),
-                ),
               if (downloaded)
                 OutlinedButton.icon(
                   onPressed: onOpen,
                   icon: const Icon(Icons.menu_book_rounded, color: Color(0xFFD4AF37)),
                   label: const Text('قراءة'),
                 )
-              else if (pdf.isNotEmpty)
+              else
                 OutlinedButton.icon(
                   onPressed: onDownload,
                   icon: const Icon(Icons.download_rounded, color: Color(0xFFD4AF37)),
-                  label: const Text('تنزيل'),
+                  label: const Text('تنزيل داخل التطبيق'),
                 ),
               if (downloaded)
                 OutlinedButton.icon(
