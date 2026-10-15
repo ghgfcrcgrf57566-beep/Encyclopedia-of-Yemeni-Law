@@ -121,12 +121,20 @@ jobs:
           echo "Release signing configured."
 
       - name: Build release APK
-        run: flutter build apk --release --dart-define=LEGAL_AI_BASE_URL=https://odd-mouse-c1e0.ghgfcrcgrf57566.workers.dev --dart-define=APP_VERSION=1.0.0
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "::warning::GEMINI_API_KEY is empty; the assistant will only use local-search fallback."
+          fi
+          flutter build apk --release --dart-define=GEMINI_API_KEY="$GEMINI_API_KEY" --dart-define=GEMINI_MODEL=gemini-3.5-flash-lite --dart-define=APP_VERSION=1.0.0
 
       - name: Build signed Play Store AAB
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           set -e
-          flutter build appbundle --release --dart-define=LEGAL_AI_BASE_URL=https://odd-mouse-c1e0.ghgfcrcgrf57566.workers.dev --dart-define=APP_VERSION=1.0.0
+          flutter build appbundle --release --dart-define=GEMINI_API_KEY="$GEMINI_API_KEY" --dart-define=GEMINI_MODEL=gemini-3.5-flash-lite --dart-define=APP_VERSION=1.0.0
           test -s build/app/outputs/bundle/release/app-release.aab
 
       - name: Check if Supreme Court PDF release exists
