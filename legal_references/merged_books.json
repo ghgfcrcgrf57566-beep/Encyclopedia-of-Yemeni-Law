@@ -4371,7 +4371,12 @@
     "description": "مرجع إضافي في المكتبة للبحث والدراسة القانونية والفقهية.",
     "full_summary": "أضيف إلى الفهرس الموضوعي للمكتبة مع تصنيفه بحسب مجاله العلمي. النسخة الرقمية تضاف عند توفر مصدر موثوق.",
     "access": "catalog_only",
-    "search_url": "https://books.google.com/books?q=%D8%A7%D9%84%D8%A7%D8%AE%D8%AA%D9%8A%D8%A7%D8%B1%20%D9%84%D8%AA%D8%B9%D9%84%D9%8A%D9%84%20%D8%A7%D9%84%D9%85%D8%AE%D8%AA%D8%A7%D8%B1%20%D8%A7%D9%84%D9%85%D9%88%D8%B5%D9%84%D9%8A"
+    "source_url": "https://www.waqfeya.com/books/%D8%A7%D9%84%D8%A7%D8%AE%D8%AA%D9%8A%D8%A7%D8%B1-%D9%84%D8%AA%D8%B9%D9%84%D9%8A%D9%84-%D8%A7%D9%84%D9%85%D8%AE%D8%AA%D8%A7%D8%B1-fcbe1cb1e5fb4920a1c250c274f162fe",
+    "editor": "محمود أبو دقيقة",
+    "volumes_count": 5,
+    "pages_count": 857,
+    "publisher": "مطبعة الحلبي - القاهرة",
+    "publication_year": 1937
   },
   {
     "id": "catalog_168",
@@ -4404,7 +4409,11 @@
     "description": "مرجع إضافي في المكتبة للبحث والدراسة القانونية والفقهية.",
     "full_summary": "أضيف إلى الفهرس الموضوعي للمكتبة مع تصنيفه بحسب مجاله العلمي. النسخة الرقمية تضاف عند توفر مصدر موثوق.",
     "access": "catalog_only",
-    "search_url": "https://books.google.com/books?q=%D8%AA%D8%AD%D9%81%D8%A9%20%D8%A7%D9%84%D9%81%D9%82%D9%87%D8%A7%D8%A1%20%D8%A7%D9%84%D8%B3%D9%85%D8%B1%D9%82%D9%86%D8%AF%D9%8A"
+    "source_url": "https://waqfeya.com/books/%D8%AA%D8%AD%D9%81%D8%A9-%D8%A7%D9%84%D9%81%D9%82%D9%87%D8%A7%D8%A1-9d4b0b2673a245549fda2a0b79ecd0e5",
+    "volumes_count": 3,
+    "pages_count": 1212,
+    "publisher": "دار الكتب العلمية",
+    "publication_year": 1984
   },
   {
     "id": "catalog_171",
@@ -4429,7 +4438,11 @@
     "description": "مرجع إضافي في المكتبة للبحث والدراسة القانونية والفقهية.",
     "full_summary": "أضيف إلى الفهرس الموضوعي للمكتبة مع تصنيفه بحسب مجاله العلمي. النسخة الرقمية تضاف عند توفر مصدر موثوق.",
     "access": "catalog_only",
-    "search_url": "https://books.google.com/books?q=%D8%A7%D9%84%D9%81%D8%AA%D8%A7%D9%88%D9%89%20%D8%A7%D9%84%D9%87%D9%86%D8%AF%D9%8A%D8%A9%20%D8%AC%D9%85%D8%A7%D8%B9%D8%A9%20%D9%85%D9%86%20%D8%A7%D9%84%D8%B9%D9%84%D9%85%D8%A7%D8%A1"
+    "source_url": "https://waqfeya.com/books/%D8%A7%D9%84%D9%81%D8%AA%D8%A7%D9%88%D9%89-%D8%A7%D9%84%D9%87%D9%86%D8%AF%D9%8A%D8%A9-3731cc655bc344bab51e00d018ffb1fe",
+    "volumes_count": 6,
+    "pages_count": 3274,
+    "publisher": "المطبعة الكبرى الأميرية - بولاق - مصر",
+    "publication_year": 2000
   },
   {
     "id": "catalog_173",
@@ -4451,7 +4464,11 @@
     "description": "مرجع إضافي في المكتبة للبحث والدراسة القانونية والفقهية.",
     "full_summary": "أضيف إلى الفهرس الموضوعي للمكتبة مع تصنيفه بحسب مجاله العلمي. النسخة الرقمية تضاف عند توفر مصدر موثوق.",
     "access": "catalog_only",
-    "search_url": "https://books.google.com/books?q=%D8%BA%D9%85%D8%B2%20%D8%B9%D9%8A%D9%88%D9%86%20%D8%A7%D9%84%D8%A8%D8%B5%D8%A7%D8%A6%D8%B1%20%D8%A7%D9%84%D8%AD%D9%85%D9%88%D9%8A"
+    "source_url": "https://waqfeya.net/books/%D8%BA%D9%85%D8%B2-%D8%B9%D9%8A%D9%88%D9%86-%D8%A7%D9%84%D8%A8%D8%B5%D8%A7%D8%A6%D8%B1-%D8%B4%D8%B1%D8%AD-%D9%83%D8%AA%D8%A7%D8%A8-%D8%A7%D9%84%D8%A3%D8%B4%D8%A8%D8%A7%D9%87-%D9%88%D8%A7%D9%84%D9%86%D8%B8%D8%A7%D8%A6%D8%B1-f893925df6704e0d86a29aec92ca7bfb",
+    "volumes_count": 4,
+    "pages_count": 1950,
+    "publisher": "دار الكتب العلمية - دار الباز",
+    "publication_year": 1985
   },
   {
     "id": "catalog_175",
@@ -4476,7 +4493,7 @@
     "description": "مرجع إضافي في المكتبة للبحث والدراسة القانونية والفقهية.",
     "full_summary": "أضيف إلى الفهرس الموضوعي للمكتبة مع تصنيفه بحسب مجاله العلمي. النسخة الرقمية تضاف عند توفر مصدر موثوق.",
     "access": "catalog_only",
-    "search_url": "https://books.google.com/books?q=%D8%A7%D9%84%D9%81%D8%B5%D9%88%D9%84%20%D9%81%D9%8A%20%D8%A7%D9%84%D8%A3%D8%B5%D9%88%D9%84%20%D8%A7%D9%84%D8%AC%D8%B5%D8%A7%D8%B5"
+    "source_url": "https://ar.wikisource.org/wiki/%D8%A3%D8%B5%D9%88%D9%84_%D8%A7%D9%84%D8%AC%D8%B5%D8%A7%D8%B5_-_%D8%A7%D9%84%D8%AC%D8%B2%D8%A1_%D8%A7%D9%84%D8%A3%D9%88%D9%84"
   },
   {
     "id": "catalog_177",
@@ -4542,7 +4559,11 @@
     "description": "مرجع إضافي في المكتبة للبحث والدراسة القانونية والفقهية.",
     "full_summary": "أضيف إلى الفهرس الموضوعي للمكتبة مع تصنيفه بحسب مجاله العلمي. النسخة الرقمية تضاف عند توفر مصدر موثوق.",
     "access": "catalog_only",
-    "search_url": "https://books.google.com/books?q=%D8%A7%D9%84%D9%83%D8%A7%D9%81%D9%8A%20%D9%81%D9%8A%20%D9%81%D9%82%D9%87%20%D8%A3%D9%87%D9%84%20%D8%A7%D9%84%D9%85%D8%AF%D9%8A%D9%86%D8%A9%20%D8%A7%D8%A8%D9%86%20%D8%B9%D8%A8%D8%AF%20%D8%A7%D9%84%D8%A8%D8%B1"
+    "source_url": "https://waqfeya.net/books/%D8%A7%D9%84%D9%83%D8%A7%D9%81%D9%8A-%D9%81%D9%8A-%D9%81%D9%82%D9%87-%D8%A3%D9%87%D9%84-%D8%A7%D9%84%D9%85%D8%AF%D9%8A%D9%86%D8%A9-%D8%A7%D9%84%D9%85%D8%A7%D9%84%D9%83%D9%8A/1a50d64e9f8d423b841295d9d9a6f2b2",
+    "volumes_count": 2,
+    "pages_count": 1184,
+    "publisher": "مكتبة الرياض الحديثة",
+    "publication_year": 1978
   },
   {
     "id": "catalog_185",
@@ -4590,7 +4611,11 @@
     "description": "مرجع إضافي في المكتبة للبحث والدراسة القانونية والفقهية.",
     "full_summary": "أضيف إلى الفهرس الموضوعي للمكتبة مع تصنيفه بحسب مجاله العلمي. النسخة الرقمية تضاف عند توفر مصدر موثوق.",
     "access": "catalog_only",
-    "search_url": "https://books.google.com/books?q=%D9%85%D9%88%D8%A7%D9%87%D8%A8%20%D8%A7%D9%84%D8%AC%D9%84%D9%8A%D9%84%20%D9%84%D8%B4%D8%B1%D8%AD%20%D9%85%D8%AE%D8%AA%D8%B5%D8%B1%20%D8%AE%D9%84%D9%8A%D9%84%20%D8%A7%D9%84%D8%AD%D8%B7%D8%A7%D8%A8"
+    "source_url": "https://waqfeya.net/books/%D9%85%D9%88%D8%A7%D9%87%D8%A8-%D8%A7%D9%84%D8%AC%D9%84%D9%8A%D9%84-%D9%84%D8%B4%D8%B1%D8%AD-%D9%85%D8%AE%D8%AA%D8%B5%D8%B1-%D8%AE%D9%84%D9%8A%D9%84-%D9%88%D8%A8%D9%87%D8%A7%D9%85%D8%B4%D9%87-%D8%A7%D9%84%D8%AA%D8%A7%D8%AC-%D9%88%D8%A7%D9%84%D8%A5%D9%83%D9%84%D9%8A%D9%84-%D9%84%D9%85%D8%AE%D8%AA%D8%B5%D8%B1-%D8%AE%D9%84%D9%8A%D9%84/1bf1b5dbf5fc4dc6bf9fa8a9734d9703",
+    "editor": "زكريا عميرات",
+    "volumes_count": 8,
+    "publisher": "دار عالم الكتب",
+    "publication_year": 2002
   },
   {
     "id": "catalog_189",
@@ -4648,7 +4673,12 @@
     "description": "مرجع إضافي في المكتبة للبحث والدراسة القانونية والفقهية.",
     "full_summary": "أضيف إلى الفهرس الموضوعي للمكتبة مع تصنيفه بحسب مجاله العلمي. النسخة الرقمية تضاف عند توفر مصدر موثوق.",
     "access": "catalog_only",
-    "search_url": "https://books.google.com/books?q=%D8%A7%D9%84%D9%86%D9%88%D8%A7%D8%AF%D8%B1%20%D9%88%D8%A7%D9%84%D8%B2%D9%8A%D8%A7%D8%AF%D8%A7%D8%AA%20%D8%A7%D8%A8%D9%86%20%D8%A3%D8%A8%D9%8A%20%D8%B2%D9%8A%D8%AF%20%D8%A7%D9%84%D9%82%D9%8A%D8%B1%D9%88%D8%A7%D9%86%D9%8A"
+    "source_url": "https://waqfeya.com/books/%D8%A7%D9%84%D9%86%D9%88%D8%A7%D8%AF%D8%B1-%D9%88%D8%A7%D9%84%D8%B2%D9%8A%D8%A7%D8%AF%D8%A7%D8%AA-%D8%B9%D9%84%D9%89-%D9%85%D8%A7-%D9%81%D9%8A-%D8%A7%D9%84%D9%85%D8%AF%D9%88%D9%86%D8%A9-%D9%85%D9%86-%D8%BA%D9%8A%D8%B1%D9%87%D8%A7-%D9%85%D9%86-%D8%A7%D9%84%D8%A3%D9%85%D9%87%D8%A7%D8%AA-b3119d77abfb438d9b172201bed054c6",
+    "editor": "عبد الفتاح الحلو - محمد الأمين بو خبزة",
+    "volumes_count": 15,
+    "pages_count": 7835,
+    "publisher": "دار الغرب الإسلامي",
+    "publication_year": 1999
   },
   {
     "id": "catalog_194",
@@ -4681,7 +4711,9 @@
     "description": "مرجع إضافي في المكتبة للبحث والدراسة القانونية والفقهية.",
     "full_summary": "أضيف إلى الفهرس الموضوعي للمكتبة مع تصنيفه بحسب مجاله العلمي. النسخة الرقمية تضاف عند توفر مصدر موثوق.",
     "access": "catalog_only",
-    "search_url": "https://books.google.com/books?q=%D8%A7%D9%84%D9%82%D9%88%D8%A7%D9%86%D9%8A%D9%86%20%D8%A7%D9%84%D9%81%D9%82%D9%87%D9%8A%D8%A9%20%D8%A7%D8%A8%D9%86%20%D8%AC%D8%B2%D9%8A"
+    "source_url": "https://waqfeya.net/books/%D8%A7%D9%84%D9%82%D9%88%D8%A7%D9%86%D9%8A%D9%86-%D8%A7%D9%84%D9%81%D9%82%D9%87%D9%8A%D8%A9-07702edf40fb44d091febd2a8afaba2f",
+    "volumes_count": 1,
+    "pages_count": 301
   },
   {
     "id": "catalog_197",
@@ -4714,7 +4746,11 @@
     "description": "مرجع إضافي في المكتبة للبحث والدراسة القانونية والفقهية.",
     "full_summary": "أضيف إلى الفهرس الموضوعي للمكتبة مع تصنيفه بحسب مجاله العلمي. النسخة الرقمية تضاف عند توفر مصدر موثوق.",
     "access": "catalog_only",
-    "search_url": "https://books.google.com/books?q=%D8%A7%D9%84%D9%85%D8%B9%D9%88%D9%86%D8%A9%20%D8%B9%D9%84%D9%89%20%D9%85%D8%B0%D9%87%D8%A8%20%D8%B9%D8%A7%D9%84%D9%85%20%D8%A7%D9%84%D9%85%D8%AF%D9%8A%D9%86%D8%A9%20%D8%A7%D9%84%D9%82%D8%A7%D8%B6%D9%8A%20%D8%B9%D8%A8%D8%AF%20%D8%A7%D9%84%D9%88%D9%87%D8%A7%D8%A8"
+    "source_url": "https://waqfeya.net/books/%D8%A7%D9%84%D9%85%D8%B9%D9%88%D9%86%D8%A9-%D8%B9%D9%84%D9%89-%D9%85%D8%B0%D9%87%D8%A8-%D8%B9%D8%A7%D9%84%D9%85-%D8%A7%D9%84%D9%85%D8%AF%D9%8A%D9%86%D8%A9/1c7b6d74489b4d37b107eb68b49a52d6",
+    "editor": "حميش عبد الحق",
+    "volumes_count": 3,
+    "pages_count": 1904,
+    "publisher": "المكتبة التجارية - مصطفى أحمد الباز - مكة المكرمة"
   },
   {
     "id": "catalog_203",
