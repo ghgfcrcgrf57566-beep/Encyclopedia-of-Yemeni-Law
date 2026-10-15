@@ -7,7 +7,6 @@ import 'package:provider/provider.dart';
 import '../core/constants.dart';
 import '../core/theme.dart';
 import '../providers/settings_provider.dart';
-import 'coming_soon_screen.dart';
 import 'contact/contact_screen.dart';
 import 'favorites/favorites_screen.dart';
 import 'feedback/feedback_screen.dart';
@@ -16,6 +15,7 @@ import 'laws/laws_home_screen.dart';
 import 'supreme_court_screen.dart';
 import 'library_screen.dart';
 import 'legal_ai/legal_ai_screen.dart';
+import 'legal_tools_screen.dart';
 
 class RootShell extends StatelessWidget {
   const RootShell({super.key});
@@ -24,7 +24,7 @@ class RootShell extends StatelessWidget {
         _SectionData(icon: Icons.auto_awesome_rounded, title: 'اسأل موسوعة القوانين اليمنية', subtitle: 'مساعد ذكي يبحث أولاً في نصوص القوانين', builder: (_) => const LegalAiScreen(), fullWidth: true),
         _SectionData(icon: Icons.menu_book_rounded, title: 'المكتبة', subtitle: 'المكتبة القانونية والمكتبة الشرعية', builder: (_) => const LibraryScreen()),
         _SectionData(icon: Icons.balance_rounded, title: 'القوانين اليمنية', subtitle: 'نصوص القوانين والمواد', builder: (_) => const LawsHomeScreen()),
-        _SectionData(icon: Icons.description_rounded, title: 'المذكرات والنماذج القانونية', subtitle: 'صحائف وعقود وإنذارات ونماذج', builder: (_) => const ComingSoonScreen(title: 'المذكرات والنماذج القانونية')),
+        _SectionData(icon: Icons.gavel_rounded, title: 'الأدوات القانونية', subtitle: 'الحاسبات والإجراءات وإدارة القضايا', builder: (_) => const LegalToolsScreen()),
         _SectionData(icon: Icons.account_balance_rounded, title: 'أحكام المحكمة العليا', subtitle: 'القواعد والمبادئ والأحكام القضائية', builder: (_) => const SupremeCourtScreen()),
         _SectionData(icon: Icons.calculate_rounded, title: 'حاسبة المواريث والتركات', subtitle: 'حساب الأنصبة والحجب والعول والرد', builder: (_) => const InheritanceCalculatorScreen()),
         _SectionData(icon: Icons.star_rounded, title: 'المفضلة', subtitle: 'المواد والعناصر المحفوظة', builder: (_) => const FavoritesScreen()),
