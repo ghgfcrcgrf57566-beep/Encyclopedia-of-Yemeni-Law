@@ -4761,7 +4761,11 @@
     "description": "مرجع إضافي في المكتبة للبحث والدراسة القانونية والفقهية.",
     "full_summary": "أضيف إلى الفهرس الموضوعي للمكتبة مع تصنيفه بحسب مجاله العلمي. النسخة الرقمية تضاف عند توفر مصدر موثوق.",
     "access": "catalog_only",
-    "search_url": "https://books.google.com/books?q=%D9%85%D9%86%D9%87%D8%A7%D8%AC%20%D8%A7%D9%84%D8%B7%D8%A7%D9%84%D8%A8%D9%8A%D9%86%20%D8%A7%D9%84%D9%86%D9%88%D9%88%D9%8A"
+    "source_url": "https://www.waqfeya.net/books/%D9%85%D9%86%D9%87%D8%A7%D8%AC-%D8%A7%D9%84%D8%B7%D8%A7%D9%84%D8%A8%D9%8A%D9%86-%D9%88%D8%B9%D9%85%D8%AF%D8%A9-%D8%A7%D9%84%D9%85%D8%AA%D9%82%D9%8A%D9%86-%D8%B7-%D8%A7%D9%84%D9%85%D9%86%D9%87%D8%A7%D8%AC-2573cb41d8b74dacb4e1012e9d76a90c",
+    "editor": "محمد محمد طاهر شعبان",
+    "publisher": "دار المنهاج",
+    "pages_count": 712,
+    "volumes_count": 1
   },
   {
     "id": "catalog_205",
@@ -4772,7 +4776,12 @@
     "description": "مرجع إضافي في المكتبة للبحث والدراسة القانونية والفقهية.",
     "full_summary": "أضيف إلى الفهرس الموضوعي للمكتبة مع تصنيفه بحسب مجاله العلمي. النسخة الرقمية تضاف عند توفر مصدر موثوق.",
     "access": "catalog_only",
-    "search_url": "https://books.google.com/books?q=%D9%85%D8%BA%D9%86%D9%8A%20%D8%A7%D9%84%D9%85%D8%AD%D8%AA%D8%A7%D8%AC%20%D8%A5%D9%84%D9%89%20%D9%85%D8%B9%D8%B1%D9%81%D8%A9%20%D8%A3%D9%84%D9%81%D8%A7%D8%B8%20%D8%A7%D9%84%D9%85%D9%86%D9%87%D8%A7%D8%AC%20%D8%A7%D9%84%D8%AE%D8%B7%D9%8A%D8%A8%20%D8%A7%D9%84%D8%B4%D8%B1%D8%A8%D9%8A%D9%86%D9%8A"
+    "source_url": "https://www.waqfeya.net/books/%D9%85%D8%BA%D9%86%D9%8A-%D8%A7%D9%84%D9%85%D8%AD%D8%AA%D8%A7%D8%AC-%D8%A5%D9%84%D9%89-%D9%85%D8%B9%D8%B1%D9%81%D8%A9-%D9%85%D8%B9%D8%A7%D9%86%D9%8A-%D8%A3%D9%84%D9%81%D8%A7%D8%B8-%D8%A7%D9%84%D9%85%D9%86%D9%87%D8%A7%D8%AC-%D8%B7-%D8%A7%D9%84%D8%B9%D9%84%D9%85%D9%8A%D8%A9-b52bac11ca4c45c18f0b77ea41c6c344",
+    "editor": "علي محمد معوض - عادل أحمد عبد الموجود",
+    "publisher": "دار الكتب العلمية - بيروت",
+    "publication_year": 2000,
+    "pages_count": 3401,
+    "volumes_count": 6
   },
   {
     "id": "catalog_206",
@@ -4827,7 +4836,12 @@
     "description": "مرجع إضافي في المكتبة للبحث والدراسة القانونية والفقهية.",
     "full_summary": "أضيف إلى الفهرس الموضوعي للمكتبة مع تصنيفه بحسب مجاله العلمي. النسخة الرقمية تضاف عند توفر مصدر موثوق.",
     "access": "catalog_only",
-    "search_url": "https://books.google.com/books?q=%D8%A7%D9%84%D9%88%D8%AC%D9%8A%D8%B2%20%D9%81%D9%8A%20%D9%81%D9%82%D9%87%20%D8%A7%D9%84%D8%A5%D9%85%D8%A7%D9%85%20%D8%A7%D9%84%D8%B4%D8%A7%D9%81%D8%B9%D9%8A%20%D8%A7%D9%84%D8%BA%D8%B2%D8%A7%D9%84%D9%8A"
+    "source_url": "https://waqfeya.net/books/%D8%A7%D9%84%D9%88%D8%AC%D9%8A%D8%B2-%D9%81%D9%8A-%D9%81%D9%82%D9%87-%D8%A7%D9%84%D8%A5%D9%85%D8%A7%D9%85-%D8%A7%D9%84%D8%B4%D8%A7%D9%81%D8%B9%D9%8A-%D8%B7-%D8%A7%D9%84%D8%A3%D8%B1%D9%82%D9%85-4352fba907af448e9499f9f5fcaf844a",
+    "editor": "علي معوض - عادل عبد الموجود",
+    "publisher": "دار الأرقم بن أبي الأرقم",
+    "publication_year": 1997,
+    "pages_count": 774,
+    "volumes_count": 2
   },
   {
     "id": "catalog_211",
@@ -4860,7 +4874,12 @@
     "description": "مرجع إضافي في المكتبة للبحث والدراسة القانونية والفقهية.",
     "full_summary": "أضيف إلى الفهرس الموضوعي للمكتبة مع تصنيفه بحسب مجاله العلمي. النسخة الرقمية تضاف عند توفر مصدر موثوق.",
     "access": "catalog_only",
-    "search_url": "https://books.google.com/books?q=%D8%A3%D8%B3%D9%86%D9%89%20%D8%A7%D9%84%D9%85%D8%B7%D8%A7%D9%84%D8%A8%20%D9%81%D9%8A%20%D8%B4%D8%B1%D8%AD%20%D8%B1%D9%88%D8%B6%20%D8%A7%D9%84%D8%B7%D8%A7%D9%84%D8%A8%20%D8%B2%D9%83%D8%B1%D9%8A%D8%A7%20%D8%A7%D9%84%D8%A3%D9%86%D8%B5%D8%A7%D8%B1%D9%8A"
+    "source_url": "https://waqfeya.net/books/%D8%A3%D8%B3%D9%86%D9%89-%D8%A7%D9%84%D9%85%D8%B7%D8%A7%D9%84%D8%A8-%D9%81%D9%8A-%D8%B4%D8%B1%D8%AD-%D8%B1%D9%88%D8%B6-%D8%A7%D9%84%D8%B7%D8%A7%D9%84%D8%A8-%D9%88%D8%A8%D9%87%D8%A7%D9%85%D8%B4%D9%87-%D8%AD%D8%A7%D8%B4%D9%8A%D8%A9-%D8%A7%D9%84%D8%B1%D9%85%D9%84%D9%8A-%D8%AA%D8%AC%D8%B1%D9%8A%D8%AF-%D8%A7%D9%84%D8%B4%D9%88%D8%A8%D8%B1%D9%8A-8aa9b9fb57b54121866a0bbfb0493570",
+    "editor": "محمد الزهري الغمراوي",
+    "publisher": "المطبعة الميمنية",
+    "publication_year": 1313,
+    "pages_count": 2072,
+    "volumes_count": 4
   },
   {
     "id": "catalog_214",
@@ -4882,7 +4901,12 @@
     "description": "مرجع إضافي في المكتبة للبحث والدراسة القانونية والفقهية.",
     "full_summary": "أضيف إلى الفهرس الموضوعي للمكتبة مع تصنيفه بحسب مجاله العلمي. النسخة الرقمية تضاف عند توفر مصدر موثوق.",
     "access": "catalog_only",
-    "search_url": "https://books.google.com/books?q=%D8%A7%D9%84%D8%A5%D9%82%D9%86%D8%A7%D8%B9%20%D9%81%D9%8A%20%D8%AD%D9%84%20%D8%A3%D9%84%D9%81%D8%A7%D8%B8%20%D8%A3%D8%A8%D9%8A%20%D8%B4%D8%AC%D8%A7%D8%B9%20%D8%A7%D9%84%D8%AE%D8%B7%D9%8A%D8%A8%20%D8%A7%D9%84%D8%B4%D8%B1%D8%A8%D9%8A%D9%86%D9%8A"
+    "source_url": "https://waqfeya.com/books/%D8%A7%D9%84%D8%A5%D9%82%D9%86%D8%A7%D8%B9-%D9%81%D9%8A-%D8%AD%D9%84-%D8%A3%D9%84%D9%81%D8%A7%D8%B8-%D8%A3%D8%A8%D9%8A-%D8%B4%D8%AC%D8%A7%D8%B9-2672fb30cc504f3cad5076eafb99b6fd",
+    "editor": "علي محمد معوض - عادل أحمد عبد الموجود",
+    "publisher": "دار الكتب العلمية",
+    "publication_year": 2004,
+    "pages_count": 1238,
+    "volumes_count": 2
   },
   {
     "id": "catalog_216",
