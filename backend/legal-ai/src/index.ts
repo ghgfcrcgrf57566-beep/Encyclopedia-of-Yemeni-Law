@@ -441,7 +441,7 @@ function buildRetrievalQuery(question: string, history: HistoryMessage[]): strin
 
   // Keep the latest question intact and add only enough prior user context
   // to resolve pronouns and short follow-ups without flooding lexical search.
-  return [...priorUserQuestions, current].join("\\n");
+  return [...priorUserQuestions, current].join("\n");
 }
 
 function normalizeHistory(value: unknown): HistoryMessage[] {
