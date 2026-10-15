@@ -54,17 +54,10 @@ class LegalAiService {
     // نفصل السؤال الحقيقي والنطاق هنا حتى لا تدخل تعليمات الواجهة في بحث SQLite.
     final q = _extractUserQuestion(raw);
 
-    // Use the deployed legal RAG service first. It searches the canonical D1
-    // corpus and returns the matched legal articles with the answer.
-    final remoteResult = await _askRemote(
-      question: q,
-      conversationId: conversationId,
-      history: history,
-    );
-    if (remoteResult != null) {
-      await _saveHistory(q, remoteResult.answer, remoteResult.responseSource);
-      return remoteResult;
-    }
+    // نستخدم Gemini API مباشرة من التطبيق كما في المسار السابق، بعد فصل
+    // السؤال ونطاق القانون. لا نعتمد على عنوان Worker/Cloudflare قديم أو معطل.
+    // تبقى قاعدة SQLite هي المصدر الأول، ويُستخدم Gemini لتخطيط البحث والشرح
+    // وترتيب المواد المحلية، ولا تُرسل مواد قانونية من قانون آخر عند تحديد النطاق.
 
     final inferredScope = _extractLawScope(raw);
     final explicitScope = _inferLawScope(q);
@@ -174,80 +167,6 @@ class LegalAiService {
     return LegalAiResult(answer: generated, sources: const [], conversationId: conversationId, responseSource: 'gemini_search_knowledge');
   }
 
-  Future<LegalAiResult?> _askRemote({
-    required String question,
-    required String? conversationId,
-    required List<Map<String, String>> history,
-  }) async {
-    var baseUrl = AppConfig.legalAiBaseUrl.trim();
-    while (baseUrl.endsWith('/')) {
-      baseUrl = baseUrl.substring(0, baseUrl.length - 1);
-    }
-    if (baseUrl.isEmpty) return null;
-
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/api/chat'),
-        headers: {
-          'Content-Type': 'application/json',
-          'x-app-version': AppConfig.appVersion,
-        },
-        body: jsonEncode({
-          'message': question,
-          'conversation_id': conversationId,
-          'language': 'ar',
-          'history': history.take(8).map((item) => {
-            'role': item['role'] == 'assistant' ? 'assistant' : 'user',
-            'content': item['content'] ?? '',
-          }).toList(),
-        }),
-      ).timeout(const Duration(seconds: 55));
-
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        String message = 'تعذر الاتصال بخدمة المساعد القانوني (HTTP ${response.statusCode}).';
-        try {
-          final errorPayload = jsonDecode(response.body);
-          if (errorPayload is Map<String, dynamic>) {
-            final serverMessage = (errorPayload['error'] ?? errorPayload['message'] ?? '').toString().trim();
-            if (serverMessage.isNotEmpty) message = serverMessage;
-          }
-        } catch (_) {
-          // احتفظ برسالة الحالة العامة إذا لم يكن الرد JSON.
-        }
-        throw LegalAiException(message);
-      }
-      final payload = jsonDecode(response.body);
-      if (payload is! Map<String, dynamic>) return null;
-      final answer = (payload['answer'] ?? '').toString().trim();
-      if (answer.isEmpty) return null;
-
-      final sources = <LegalAiSource>[];
-      final rawSources = payload['sources'];
-      if (rawSources is List) {
-        for (final item in rawSources) {
-          if (item is Map<String, dynamic>) {
-            sources.add(LegalAiSource.fromJson(item));
-          } else if (item is Map) {
-            sources.add(LegalAiSource.fromJson(Map<String, dynamic>.from(item)));
-          }
-        }
-      }
-
-      return LegalAiResult(
-        answer: answer,
-        sources: sources,
-        conversationId: (payload['conversation_id'] ?? conversationId)?.toString(),
-        responseSource: (payload['response_source'] ?? 'cloudflare_legal_rag').toString(),
-      );
-    } on LegalAiException {
-      rethrow;
-    } catch (_) {
-      // Network errors may use the local-only fallback; never call Gemini
-      // directly from the APK when no client API key is configured.
-      return null;
-    }
-  }
-
   String _extractUserQuestion(String raw) {
     final marker = 'السؤال القانوني:';
     final index = raw.lastIndexOf(marker);
@@ -260,7 +179,14 @@ class LegalAiService {
 
   String _extractLawScope(String raw) {
     final match = RegExp(r'نطاق البحث الإلزامي:\s*(.+?)\s*فقط').firstMatch(raw);
-    if (match != null && match.group(1)?.trim().isNotEmpty == true) return match.group(1)!.trim();
+    if (match != null && match.group(1)?.trim().isNotEmpty == true) {
+      // واجهة المساعد ترسل النطاق بصيغة "ابحث في القانون المدني فقط".
+      // احذف فعل التوجيه قبل مطابقة اسم القانون في قاعدة SQLite.
+      return match.group(1)!.trim().replaceFirst(
+        RegExp(r'^(?:ابحث|فتش)\s+في\s+', caseSensitive: false),
+        '',
+      ).trim();
+    }
     return 'الكل';
   }
 
@@ -433,7 +359,7 @@ match=true فقط إذا كانت الإجابة مرتبطة مباشرة با�
 
   Future<String> _callGemini(String prompt, {List<Map<String, String>> history = const [], double temperature = 0.0}) async {
     final model = AppConfig.geminiModel.trim().isEmpty ? 'gemini-3.5-flash-lite' : AppConfig.geminiModel.trim();
-    final uri = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=${Uri.encodeQueryComponent(AppConfig.geminiApiKey.trim())}');
+    final uri = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent');
     final contents = <Map<String, dynamic>>[];
     for (final item in history.take(8)) {
       final role = item['role'] == 'assistant' ? 'model' : 'user';
@@ -442,7 +368,10 @@ match=true فقط إذا كانت الإجابة مرتبطة مباشرة با�
     }
     contents.add({'role': 'user', 'parts': [{'text': prompt}]});
 
-    final response = await http.post(uri, headers: {'Content-Type': 'application/json'}, body: jsonEncode({
+    final response = await http.post(uri, headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': AppConfig.geminiApiKey.trim(),
+    }, body: jsonEncode({
       'contents': contents,
       'generationConfig': {'temperature': temperature, 'responseMimeType': 'text/plain'},
     })).timeout(const Duration(seconds: 45));
