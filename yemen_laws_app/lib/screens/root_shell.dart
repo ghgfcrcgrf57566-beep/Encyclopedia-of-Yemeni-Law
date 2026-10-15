@@ -57,17 +57,17 @@ class RootShell extends StatelessWidget {
           statusBarColor: Colors.transparent,
           statusBarIconBrightness: context.isDark ? Brightness.light : Brightness.dark,
           statusBarBrightness: context.isDark ? Brightness.dark : Brightness.light,
-          systemNavigationBarColor: context.isDark ? AppColors.darkBackground : AppColors.lightBackground,
+          systemNavigationBarColor: Colors.black,
           systemNavigationBarIconBrightness: context.isDark ? Brightness.light : Brightness.dark,
         ),
         child: Scaffold(
-          backgroundColor: context.isDark ? AppColors.darkBackground : AppColors.lightBackground,
+          backgroundColor: Colors.black,
           body: Stack(fit: StackFit.expand, children: [
             ColorFiltered(
-              colorFilter: context.isDark ? const ColorFilter.mode(Colors.transparent, BlendMode.dst) : ColorFilter.mode(Colors.white.withOpacity(.72), BlendMode.screen),
+              colorFilter: const ColorFilter.mode(Colors.transparent, BlendMode.dst),
               child: const _LibraryBackground(),
             ),
-            Container(color: context.isDark ? const Color(0x8F120A06) : const Color(0x331A1208)),
+            const ColoredBox(color: Colors.black),
             SafeArea(
               child: LayoutBuilder(builder: (context, constraints) {
                 final horizontalPadding = constraints.maxWidth >= 700 ? 26.0 : 12.0;
@@ -245,12 +245,12 @@ class _LibraryPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
-    canvas.drawRect(rect, Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF5A3219), Color(0xFF24150D), Color(0xFF100A07)]).createShader(rect));
-    final shelfPaint = Paint()..color = const Color(0x663C2110);
+    canvas.drawRect(rect, Paint()..color = Colors.black);
+    final shelfPaint = Paint()..color = Colors.transparent;
     for (double y = size.height * .17; y < size.height; y += 150) {
       canvas.drawRect(Rect.fromLTWH(0, y, size.width, 9), shelfPaint);
     }
-    final bookColors = [const Color(0x663F2715), const Color(0x664F3219), const Color(0x665E3C1D), const Color(0x66352619)];
+    final bookColors = [Colors.transparent, Colors.transparent, Colors.transparent, Colors.transparent];
     var seed = 7;
     for (double y = size.height * .02; y < size.height; y += 150) {
       var x = -20.0;
