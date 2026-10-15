@@ -64,12 +64,35 @@ class _LibraryScreenState extends State<LibraryScreen> {
   final Set<String> _reading = {};
   Set<String> _downloaded = {};
   bool _loading = true;
+  final TextEditingController _librarySearchController = TextEditingController();
+  String _librarySearchQuery = '';
+
+  String _normalizeSearchText(String value) => value
+      .toLowerCase()
+      .replaceAll(RegExp(r'[ـًٌٍَُِّْٰ]'), '')
+      .replaceAll(RegExp(r'[أإآ]'), 'ا')
+      .replaceAll('ى', 'ي')
+      .replaceAll('ة', 'ه')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+
+  List<Map<String, dynamic>> get _searchResults {
+    final query = _normalizeSearchText(_librarySearchQuery);
+    if (query.isEmpty) return const [];
+    return _libraryItems.where((item) {
+      final searchable = _normalizeSearchText([
+        item['title'], item['author'], item['category'], item['description'], item['full_summary']
+      ].whereType<Object>().join(' '));
+      return searchable.contains(query);
+    }).toList();
+  }
 
   @override
   void initState() { super.initState(); _loadIndex(); }
 
   @override
   void dispose() {
+    _librarySearchController.dispose();
     for (final token in _tokens.values) token.cancel('library_disposed');
     _dio.close(force: true);
     super.dispose();
@@ -517,6 +540,94 @@ class _LibraryScreenState extends State<LibraryScreen> {
                           physics: const BouncingScrollPhysics(),
                           padding: EdgeInsets.fromLTRB(compact ? 13 : 19, 4, compact ? 13 : 19, 24),
                           children: [
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 18),
+                              decoration: BoxDecoration(
+                                color: const Color(0xE61E080F),
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(color: const Color(0x99D4AF37)),
+                                boxShadow: const [
+                                  BoxShadow(color: Color(0x22000000), blurRadius: 12, offset: Offset(0, 4)),
+                                ],
+                              ),
+                              child: TextField(
+                                controller: _librarySearchController,
+                                onChanged: (value) => setState(() => _librarySearchQuery = value),
+                                textDirection: TextDirection.rtl,
+                                textInputAction: TextInputAction.search,
+                                style: const TextStyle(color: Colors.white, fontSize: 15),
+                                decoration: InputDecoration(
+                                  hintText: 'بحث في جميع الكتب والمراجع',
+                                  hintStyle: const TextStyle(color: Color(0xFFB9A5A8), fontSize: 13),
+                                  prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFFF4D982), size: 27),
+                                  suffixIcon: _librarySearchQuery.isEmpty
+                                      ? null
+                                      : IconButton(
+                                          tooltip: 'مسح البحث',
+                                          onPressed: () {
+                                            _librarySearchController.clear();
+                                            setState(() => _librarySearchQuery = '');
+                                          },
+                                          icon: const Icon(Icons.close_rounded, color: Color(0xFFF4D982)),
+                                        ),
+                                  border: InputBorder.none,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 17),
+                                ),
+                              ),
+                            ),
+                            if (_librarySearchQuery.trim().isNotEmpty) ...[
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 10, right: 4, left: 4),
+                                child: Align(
+                                  alignment: Alignment.centerRight,
+                                  child: Text(
+                                    _searchResults.isEmpty
+                                        ? 'لا توجد نتائج مطابقة'
+                                        : 'نتائج البحث: ${_searchResults.length} كتابًا ومرجعًا',
+                                    textAlign: TextAlign.right,
+                                    style: const TextStyle(color: Color(0xFFF4D982), fontWeight: FontWeight.w800, fontSize: 14),
+                                  ),
+                                ),
+                              ),
+                              if (_searchResults.isEmpty)
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 28),
+                                  child: Center(
+                                    child: Text(
+                                      'جرّب عنوانًا آخر أو اسم المؤلف أو موضوع الكتاب.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(color: Colors.white70, height: 1.7),
+                                    ),
+                                  ),
+                                )
+                              else
+                                ..._searchResults.take(50).map((item) => Container(
+                                  margin: const EdgeInsets.only(bottom: 10),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xB31E080F),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: const Color(0x55D4AF37)),
+                                  ),
+                                  child: _BookCard(
+                                    item: item,
+                                    downloaded: _downloaded.contains(_fileName(item)),
+                                    progress: _progress,
+                                    onDownload: _download,
+                                    onPause: _pause,
+                                    onInfo: _showInfo,
+                                  ),
+                                )),
+                              if (_searchResults.length > 50)
+                                const Padding(
+                                  padding: EdgeInsets.only(bottom: 12),
+                                  child: Text(
+                                    'تظهر أول 50 نتيجة؛ أضف كلمات أدق لتضييق البحث.',
+                                    textAlign: TextAlign.right,
+                                    style: TextStyle(color: Colors.white54, fontSize: 12),
+                                  ),
+                                ),
+                              const SizedBox(height: 14),
+                            ],
                             _LibraryHeroBentoCard(
                               height: heroHeight,
                               loading: _loading,
