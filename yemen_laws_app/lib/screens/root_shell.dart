@@ -61,7 +61,7 @@ class RootShell extends StatelessWidget {
           systemNavigationBarIconBrightness: context.isDark ? Brightness.light : Brightness.dark,
         ),
         child: Scaffold(
-          backgroundColor: context.isDark ? AppColors.darkBackground : AppColors.lightBackground,
+          backgroundColor: Colors.black,
           body: Stack(fit: StackFit.expand, children: [
             ColorFiltered(
               colorFilter: context.isDark ? const ColorFilter.mode(Colors.transparent, BlendMode.dst) : ColorFilter.mode(Colors.white.withOpacity(.72), BlendMode.screen),
