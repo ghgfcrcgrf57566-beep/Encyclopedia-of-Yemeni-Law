@@ -4,7 +4,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../data/models/law.dart';
 import '../data/models/madda.dart';
 import '../data/repositories/laws_repository.dart';
-import '../data/repositories/laws_repository.dart' show DocumentItem;
 
 const _sourceGold = Color(0xFFD4AF6A);
 const _sourcePanel = Color(0xFF171310);
