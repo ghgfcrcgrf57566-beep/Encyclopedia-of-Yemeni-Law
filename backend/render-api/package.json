@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "check": "node --check server.js"
+    "check": "node --check lib/handler.js && node --check api/index.js && node --check api/health.js && node --check api/chat.js && node --check api/legal/ask.js"
+  },
+  "dependencies": {
+    "sql.js": "1.13.0"
   },
   "engines": {
     "node": ">=20"
