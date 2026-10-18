@@ -1,4 +1,4 @@
-import initSqlJs from "sql.js";
+import initSqlJs from "fts5-sql-bundle";
 import { fileURLToPath } from "node:url";
 
 const MODEL = (process.env.AI_MODEL || "gemini-3.8-flash").trim().replace(/^models\\//, "");
@@ -89,7 +89,7 @@ async function loadLegalDb() {
       const bytes = new Uint8Array(await response.arrayBuffer());
       if (!bytes.length || bytes.length > MAX_DB_BYTES) throw new Error("Legal DB file is empty or too large");
 
-      const wasmPath = fileURLToPath(new URL("../node_modules/sql.js/dist/sql-wasm.wasm", import.meta.url));
+      const wasmPath = fileURLToPath(new URL("../node_modules/fts5-sql-bundle/dist/sql-wasm.wasm", import.meta.url));
       const SQL = await initSqlJs({ locateFile: (file) => file === "sql-wasm.wasm" ? wasmPath : file });
       const db = new SQL.Database(bytes);
       const tableNames = db.exec("SELECT name FROM sqlite_master WHERE type='table'");
