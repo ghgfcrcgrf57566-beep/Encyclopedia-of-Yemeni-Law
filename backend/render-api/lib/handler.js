@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 
-const MODEL = (process.env.AI_MODEL || "gemini-3.8-flash").trim().replace(/^models\\//, "");
+const MODEL = (process.env.AI_MODEL || "gemini-3.8-flash").trim().replace(/^models\//, "");
 const MAX_QUESTION_CHARS = Math.max(100, Number(process.env.MAX_QUESTION_CHARS || 1200));
 const MAX_BODY_BYTES = 64 * 1024;
 const DEFAULT_LEGAL_DB_URL = "https://raw.githubusercontent.com/ghgfcrcgrf57566-beep/Encyclopedia-of-Yemeni-Law/main/yemen_laws_app/assets/db/app_database.db";
