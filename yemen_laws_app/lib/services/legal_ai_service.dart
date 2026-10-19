@@ -96,27 +96,70 @@ class LegalAiService {
     // بدل إرسال طلب غير موثق إلى Google وإظهار خطأ callers غير المسجلين.
     if (AppConfig.geminiApiKey.trim().isEmpty) {
       final localRows = await _searchLocal(q, lawId: selectedLaw?.id, limit: 8);
-      if (localRows.isEmpty) {
-        // لا يوجد مفتاح Gemini داخل التطبيق: أرسل السؤال إلى خادم Vercel،
-        // الذي يبحث أولاً في قاعدة القوانين ثم يستخدم NVIDIA المجاني عند عدم وجود تطابق.
-        try {
-          final base = AppConfig.legalAiBaseUrl.trim().replaceFirst(RegExp(r'/+
-      final uniqueRows = <Madda>[];
-      final rowIds = <int>{};
-      for (final row in localRows) {
-        if (rowIds.add(row.id)) uniqueRows.add(row);
+      if (localRows.isNotEmpty) {
+        final uniqueRows = <Madda>[];
+        final rowIds = <int>{};
+        for (final row in localRows) {
+          if (rowIds.add(row.id)) uniqueRows.add(row);
+        }
+        final answer = 'هذه نتائج البحث من قاعدة القوانين المحلية، وليست حكمًا بأن كل نتيجة تنطبق على سؤالك:\\n\\n' +
+            uniqueRows.take(5).map((m) =>
+              '${m.lawName ?? 'القوانين اليمنية'}، المادة ${m.number}:\\n${m.body.trim()}'
+            ).join('\\n\\n---\\n\\n');
+        await _saveHistory(q, answer, 'local_search_fallback');
+        return LegalAiResult(
+          answer: answer,
+          sources: uniqueRows.take(5).map(LegalAiSource.fromMadda).toList(),
+          conversationId: conversationId,
+          responseSource: 'local_search_fallback',
+        );
       }
-      final answer = 'تعذر الوصول مؤقتًا إلى خدمة صياغة الإجابة. هذه نتائج البحث من قاعدة القوانين المحلية، وليست حكمًا بأن كل نتيجة تنطبق على سؤالك:\\n\\n' +
-          uniqueRows.take(5).map((m) =>
-            '${m.lawName ?? 'القوانين اليمنية'}، المادة ${m.number}:\\n${m.body.trim()}'
-          ).join('\\n\\n---\\n\\n');
-      await _saveHistory(q, answer, 'local_search_fallback');
-      return LegalAiResult(
-        answer: answer,
-        sources: uniqueRows.take(5).map(LegalAiSource.fromMadda).toList(),
-        conversationId: conversationId,
-        responseSource: 'local_search_fallback',
-      );
+
+      // لا يوجد مفتاح Gemini ولا نتائج محلية: أرسل السؤال إلى الخادم
+      // ليستخدم نموذج NVIDIA المجاني الاحتياطي.
+      try {
+        var base = AppConfig.legalAiBaseUrl.trim();
+        while (base.endsWith('/')) {
+          base = base.substring(0, base.length - 1);
+        }
+        final response = await http.post(
+          Uri.parse('$base/api/chat'),
+          headers: const {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'message': q,
+            'history': history.take(12).map((item) => {
+              'role': item['role'] == 'assistant' ? 'assistant' : 'user',
+              'content': item['content'] ?? item['text'] ?? '',
+            }).toList(),
+          }),
+        ).timeout(const Duration(seconds: 25));
+        Map<String, dynamic> payload = {};
+        try {
+          final decoded = jsonDecode(response.body);
+          if (decoded is Map<String, dynamic>) payload = decoded;
+        } catch (_) {}
+        final serverAnswer = (payload['answer'] ?? payload['response'] ?? '').toString().trim();
+        if (response.statusCode >= 200 && response.statusCode < 300 && serverAnswer.isNotEmpty) {
+          final source = (payload['response_source'] ?? 'vercel_ai_gateway').toString();
+          await _saveHistory(q, serverAnswer, source);
+          return LegalAiResult(
+            answer: serverAnswer,
+            sources: (payload['sources'] is List)
+                ? (payload['sources'] as List)
+                    .whereType<Map<String, dynamic>>()
+                    .map((item) => LegalAiSource.fromJson(item))
+                    .toList()
+                : const [],
+            conversationId: conversationId,
+            responseSource: source,
+          );
+        }
+      } catch (_) {
+        // عند تعذر الخادم، نعرض رسالة فشل واضحة أدناه.
+      }
+      const answer = 'تعذر الوصول إلى خدمة المساعد الاحتياطية، ولم أعثر في قاعدة القوانين المحلية على مواد مرتبطة بما يكفي للإجابة. تحقق من اتصال الإنترنت وحاول مرة أخرى.';
+      await _saveHistory(q, answer, 'local_no_match');
+      return LegalAiResult(answer: answer, sources: const [], conversationId: conversationId, responseSource: 'local_no_match');
     }
 
     final plan = await _planSearchWithGemini(q, requestedScope, history);
