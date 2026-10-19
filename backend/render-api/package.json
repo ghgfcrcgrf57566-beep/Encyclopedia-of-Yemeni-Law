@@ -1,0 +1,16 @@
+{
+  "name": "yemen-laws-render-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check lib/handler.js && node --check api/index.js && node --check api/health.js && node --check api/chat.js && node --check api/legal/ask.js"
+  },
+  "dependencies": {
+    "fts5-sql-bundle": "1.0.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
