@@ -2,7 +2,7 @@
   "version": 2,
   "functions": {
     "api/**/*.js": {
-      "includeFiles": ["node_modules/fts5-sql-bundle/dist/sql-wasm.wasm"]
+      "includeFiles": "node_modules/fts5-sql-bundle/dist/sql-wasm.wasm"
     }
   },
   "rewrites": [
