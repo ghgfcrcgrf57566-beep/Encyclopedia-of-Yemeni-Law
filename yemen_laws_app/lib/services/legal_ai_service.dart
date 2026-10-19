@@ -54,6 +54,59 @@ class LegalAiService {
     // نفصل السؤال الحقيقي والنطاق هنا حتى لا تدخل تعليمات الواجهة في بحث SQLite.
     final q = _extractUserQuestion(raw);
 
+    // عند غياب مفتاح Gemini، اجعل خادم Vercel هو المسار الأساسي مباشرة،
+    // ولا تبحث في SQLite المحلية ولا تعرض نتائجها بدلاً من إجابة النموذج.
+    if (AppConfig.geminiApiKey.trim().isEmpty) {
+      try {
+        var base = AppConfig.legalAiBaseUrl.trim();
+        while (base.endsWith('/')) {
+          base = base.substring(0, base.length - 1);
+        }
+        final response = await http.post(
+          Uri.parse('$base/api/chat'),
+          headers: const {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'message': q,
+            'history': history.take(12).map((item) => {
+              'role': item['role'] == 'assistant' ? 'assistant' : 'user',
+              'content': item['content'] ?? item['text'] ?? '',
+            }).toList(),
+          }),
+        ).timeout(const Duration(seconds: 30));
+        Map<String, dynamic> payload = {};
+        try {
+          final decoded = jsonDecode(response.body);
+          if (decoded is Map<String, dynamic>) payload = decoded;
+        } catch (_) {}
+        final serverAnswer = (payload['answer'] ?? payload['response'] ?? '').toString().trim();
+        if (response.statusCode >= 200 && response.statusCode < 300 && serverAnswer.isNotEmpty) {
+          final source = (payload['response_source'] ?? 'vercel_ai_gateway').toString();
+          await _saveHistory(q, serverAnswer, source);
+          return LegalAiResult(
+            answer: serverAnswer,
+            sources: (payload['sources'] is List)
+                ? (payload['sources'] as List)
+                    .whereType<Map<String, dynamic>>()
+                    .map((item) => LegalAiSource.fromJson(item))
+                    .toList()
+                : const [],
+            conversationId: conversationId,
+            responseSource: source,
+          );
+        }
+        final detail = (payload['error'] ?? payload['message'] ?? '').toString().trim();
+        final message = detail.isNotEmpty
+            ? 'تعذر الحصول على إجابة من الخادم الاحتياطي: $detail'
+            : 'تعذر الحصول على إجابة من الخادم الاحتياطي (HTTP ${response.statusCode}). حاول مرة أخرى.';
+        await _saveHistory(q, message, 'vercel_gateway_error');
+        return LegalAiResult(answer: message, sources: const [], conversationId: conversationId, responseSource: 'vercel_gateway_error');
+      } catch (_) {
+        const message = 'تعذر الاتصال بخادم المساعد الاحتياطي. تحقق من اتصال الإنترنت وحاول مرة أخرى.';
+        await _saveHistory(q, message, 'vercel_gateway_error');
+        return LegalAiResult(answer: message, sources: const [], conversationId: conversationId, responseSource: 'vercel_gateway_error');
+      }
+    }
+
     // نستخدم Gemini API مباشرة من التطبيق كما في المسار السابق، بعد فصل
     // السؤال ونطاق القانون. لا نعتمد على عنوان Worker/Cloudflare قديم أو معطل.
     // تبقى قاعدة SQLite هي المصدر الأول، ويُستخدم Gemini لتخطيط البحث والشرح
