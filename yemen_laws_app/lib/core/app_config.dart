@@ -1,11 +1,10 @@
 class AppConfig {
   AppConfig._();
 
-  // Kept for compatibility with older builds; the assistant uses Gemini
-  // directly and does not depend on the legacy Cloudflare Worker URL.
+  // Vercel Preview API; override with --dart-define=LEGAL_AI_BASE_URL=... when needed.
   static const legalAiBaseUrl = String.fromEnvironment(
     'LEGAL_AI_BASE_URL',
-    defaultValue: 'https://odd-mouse-c1e0.ghgfcrcgrf57566.workers.dev',
+    defaultValue: 'https://yemen-law-gemini-3kow7qasa-li-4e33.vercel.app',
   );
 
   static const geminiApiKey = String.fromEnvironment(
