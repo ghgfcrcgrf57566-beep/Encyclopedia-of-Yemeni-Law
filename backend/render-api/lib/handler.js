@@ -250,7 +250,7 @@ export async function handleChat(req, res) {
     ["مساء الخير", "مساء النور! كيف يمكنني مساعدتك؟"],
     ["شكرا", "على الرحب والسعة، يسعدني مساعدتك."]
   ]);
-  const greetingReply = greetingReplies.get(normalizedQuestion);
+  const greetingReply = [...greetingReplies.entries()].find(([phrase]) => normalizeArabic(phrase) === normalizedQuestion)?.[1];
   if (greetingReply) {
     return send(res, 200, {
       answer: greetingReply,
