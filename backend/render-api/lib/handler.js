@@ -88,7 +88,11 @@ async function loadLegalDb() {
       const bytes = new Uint8Array(await response.arrayBuffer());
       if (!bytes.length || bytes.length > MAX_DB_BYTES) throw new Error("Legal DB file is empty or too large");
 
-      const { default: initSqlJs } = await import("fts5-sql-bundle");
+      const sqlModule = await import("fts5-sql-bundle");
+      const initSqlJs = typeof sqlModule.default === "function"
+        ? sqlModule.default
+        : (typeof sqlModule.default?.default === "function" ? sqlModule.default.default : sqlModule.initSqlJs);
+      if (typeof initSqlJs !== "function") throw new Error("Could not resolve SQL.js initializer from fts5-sql-bundle");
       const wasmPath = fileURLToPath(new URL("../node_modules/fts5-sql-bundle/dist/sql-wasm.wasm", import.meta.url));
       const SQL = await initSqlJs({ locateFile: (file) => file === "sql-wasm.wasm" ? wasmPath : file });
       const db = new SQL.Database(bytes);
