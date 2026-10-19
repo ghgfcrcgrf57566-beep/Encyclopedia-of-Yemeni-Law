@@ -1,4 +1,3 @@
-import initSqlJs from "fts5-sql-bundle";
 import { fileURLToPath } from "node:url";
 
 const MODEL = (process.env.AI_MODEL || "gemini-3.8-flash").trim().replace(/^models\\//, "");
@@ -89,6 +88,7 @@ async function loadLegalDb() {
       const bytes = new Uint8Array(await response.arrayBuffer());
       if (!bytes.length || bytes.length > MAX_DB_BYTES) throw new Error("Legal DB file is empty or too large");
 
+      const { default: initSqlJs } = await import("fts5-sql-bundle");
       const wasmPath = fileURLToPath(new URL("../node_modules/fts5-sql-bundle/dist/sql-wasm.wasm", import.meta.url));
       const SQL = await initSqlJs({ locateFile: (file) => file === "sql-wasm.wasm" ? wasmPath : file });
       const db = new SQL.Database(bytes);
@@ -198,7 +198,7 @@ export async function health(res) {
     gemini_configured: Boolean(process.env.GEMINI_API_KEY?.trim()),
     model: MODEL,
     legal_database_connected: legalDatabaseConnected,
-    legal_database_error: legalDatabaseConnected ? undefined : "تعذر تحميل قاعدة البيانات القانونية من المصدر المحدد.",
+    legal_database_error: legalDatabaseConnected ? undefined : (legalDatabaseError || "تعذر تحميل قاعدة البيانات القانونية من المصدر المحدد."),
     status: legalDatabaseConnected ? "legal-database-ready" : "database-unavailable",
   });
 }
