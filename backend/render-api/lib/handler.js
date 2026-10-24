@@ -1,6 +1,12 @@
 import { fileURLToPath } from "node:url";
 
 const MODEL = (process.env.AI_MODEL || "gemini-3.8-flash").trim().replace(/^models\//, "");
+const FREE_FALLBACK_MODELS = [
+  "nvidia/nemotron-3.5-lightning-free",
+  "reflection/beam-free",
+  "poolside/laguna-s-2.1-free",
+];
+const FREE_FALLBACK_MODEL = FREE_FALLBACK_MODELS[0];
 const MAX_QUESTION_CHARS = Math.max(100, Number(process.env.MAX_QUESTION_CHARS || 1200));
 const MAX_BODY_BYTES = 64 * 1024;
 const DEFAULT_LEGAL_DB_URL = "https://raw.githubusercontent.com/ghgfcrcgrf57566-beep/Encyclopedia-of-Yemeni-Law/main/yemen_laws_app/assets/db/app_database.db";
@@ -200,7 +206,10 @@ export async function health(res) {
     ok: true,
     service: "yemen-laws-vercel-api",
     gemini_configured: Boolean(process.env.GEMINI_API_KEY?.trim()),
+    ai_gateway_configured: Boolean((process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN || "").trim()),
     model: MODEL,
+    free_fallback_model: FREE_FALLBACK_MODEL,
+    free_fallback_models: FREE_FALLBACK_MODELS,
     legal_database_connected: legalDatabaseConnected,
     legal_database_error: legalDatabaseConnected ? undefined : (legalDatabaseError || "تعذر تحميل قاعدة البيانات القانونية من المصدر المحدد."),
     status: legalDatabaseConnected ? "legal-database-ready" : "database-unavailable",
@@ -234,6 +243,31 @@ export async function handleChat(req, res) {
     role: item?.role === "assistant" || item?.role === "model" ? "model" : "user",
     text: String(item?.content ?? item?.text ?? "").slice(0, 4000),
   })).filter((item) => item.text.trim()) : [];
+
+  // Handle unambiguous greetings locally so they never depend on the legal DB or an external model.
+  const normalizedQuestion = normalizeArabic(question);
+  const greetingReplies = new Map([
+    ["السلام عليكم", "وعليكم السلام ورحمة الله وبركاته، أهلًا بك. كيف يمكنني مساعدتك؟"],
+    ["السلام عليكم ورحمة الله وبركاته", "وعليكم السلام ورحمة الله وبركاته، أهلًا بك. كيف يمكنني مساعدتك؟"],
+    ["مرحبا", "مرحبًا بك! كيف يمكنني مساعدتك؟"],
+    ["اهلا", "أهلًا وسهلًا بك. كيف يمكنني مساعدتك؟"],
+    ["اهلا وسهلا", "أهلًا وسهلًا بك. كيف يمكنني مساعدتك؟"],
+    ["صباح الخير", "صباح النور والسرور! كيف يمكنني مساعدتك؟"],
+    ["مساء الخير", "مساء النور! كيف يمكنني مساعدتك؟"],
+    ["شكرا", "على الرحب والسعة، يسعدني مساعدتك."]
+  ]);
+  const greetingReply = [...greetingReplies.entries()].find(([phrase]) => normalizeArabic(phrase) === normalizedQuestion)?.[1];
+  if (greetingReply) {
+    return send(res, 200, {
+      answer: greetingReply,
+      response: greetingReply,
+      sources: [],
+      webSources: [],
+      response_source: "local_greeting",
+      model: "local-rule",
+      fallback_used: false
+    });
+  }
 
   let db;
   try {
@@ -277,11 +311,87 @@ export async function handleChat(req, res) {
   }
 
   const apiKey = process.env.GEMINI_API_KEY?.trim();
-  if (!apiKey) {
-    return send(res, 503, {
-      error: "لم نعثر على مادة محلية مناسبة، وخدمة Gemini غير مهيأة. أضف GEMINI_API_KEY إلى متغيرات البيئة في Vercel.",
-      response_source: "no_local_match_no_gemini_key",
+  const gatewayKey = (process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN || "").trim();
+
+  async function tryFreeGatewayFallback(reason) {
+    if (!gatewayKey) {
+      console.error("AI Gateway fallback unavailable: missing gateway authentication", reason || "");
+      return null;
+    }
+
+    // Try free models in order. Each attempt has a bounded timeout so one
+    // unavailable provider cannot consume the whole mobile request window.
+    for (const model of FREE_FALLBACK_MODELS) {
+      try {
+        const gatewayResponse = await fetch("https://ai-gateway.vercel.sh/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${gatewayKey}`,
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: "system", content: SYSTEM_INSTRUCTION + " أجب بالعربية الواضحة. إذا كان السؤال قانونيًا، لا تختلق نصوصًا أو أرقام مواد يمنية، واذكر حدود معرفتك. إذا كانت الرسالة تحية أو مجاملة، فأجب بصورة طبيعية ومختصرة." },
+              ...history.map((item) => ({ role: item.role === "model" ? "assistant" : "user", content: item.text })),
+              { role: "user", content: question },
+            ],
+            stream: false,
+            max_tokens: 900,
+          }),
+          signal: AbortSignal.timeout(8500),
+        });
+
+        const rawGateway = await gatewayResponse.text();
+        let gatewayPayload = {};
+        try { gatewayPayload = JSON.parse(rawGateway); } catch {}
+
+        if (!gatewayResponse.ok) {
+          // Do not log provider response bodies: they may contain request details.
+          console.warn("AI Gateway model failed; trying next free model:", model, gatewayResponse.status);
+          continue;
+        }
+
+        const gatewayAnswer = gatewayPayload.choices?.[0]?.message?.content;
+        if (typeof gatewayAnswer !== "string" || !gatewayAnswer.trim()) {
+          console.warn("AI Gateway model returned no text; trying next free model:", model);
+          continue;
+        }
+
+        return { answer: gatewayAnswer.trim(), model };
+      } catch (error) {
+        console.warn("AI Gateway model request failed; trying next free model:", model, error?.name || "unknown");
+      }
+    }
+
+    console.error("All free AI Gateway fallback models failed", reason || "");
+    return null;
+  }
+  async function sendGatewayFallback(reason) {
+    const fallbackResult = await tryFreeGatewayFallback(reason);
+    if (!fallbackResult) {
+      return send(res, 502, {
+        error: "تعذر توليد الإجابة حاليًا. تعذّر عمل النماذج المجانية المتاحة؛ حاول لاحقًا.",
+        response_source: "all_ai_providers_failed",
+        attempted_models: FREE_FALLBACK_MODELS,
+      });
+    }
+    const fallbackAnswer = fallbackResult.answer;
+    const warning = "تنبيه: لم يُعثر على مادة محلية مناسبة في قاعدة الموسوعة لهذا السؤال؛ تحقّق من النصوص الرسمية قبل الاعتماد على الإجابة.";
+    return send(res, 200, {
+      answer: fallbackAnswer + "\n\n" + warning,
+      response: fallbackAnswer,
+      sources: [],
+      webSources: [],
+      response_source: "vercel_ai_gateway_free_fallback",
+      model: fallbackResult.model,
+      fallback_used: true,
+      warning,
     });
+  }
+
+  if (!apiKey) {
+    return sendGatewayFallback("gemini_key_missing");
   }
 
   let response;
@@ -299,12 +409,12 @@ export async function handleChat(req, res) {
           })), { role: "user", parts: [{ text: question }] }],
           generationConfig: { maxOutputTokens: 900 },
         }),
-        signal: AbortSignal.timeout(45000),
+        signal: AbortSignal.timeout(12000),
       },
     );
   } catch (error) {
     console.error("Gemini network error:", error?.name || "unknown");
-    return send(res, 502, { error: "تعذر الاتصال بخدمة المساعد حاليًا. حاول مرة أخرى." });
+    return sendGatewayFallback("gemini_network_error");
   }
 
   const raw = await response.text();
@@ -312,13 +422,13 @@ export async function handleChat(req, res) {
   try { payload = JSON.parse(raw); } catch {}
   if (!response.ok) {
     console.error("Gemini HTTP error:", response.status);
-    return send(res, 502, { error: "تعذر توليد الإجابة حاليًا.", upstream_status: response.status });
+    return sendGatewayFallback(`gemini_http_${response.status}`);
   }
 
   const answer = (payload.candidates?.[0]?.content?.parts || [])
     .map((part) => typeof part.text === "string" ? part.text : "")
     .join("").trim();
-  if (!answer) return send(res, 502, { error: "لم تُرجع خدمة المساعد إجابة نصية." });
+  if (!answer) return sendGatewayFallback("gemini_empty_answer");
 
   return send(res, 200, {
     answer: answer + "\n\nتنبيه: لم يُعثر على مادة محلية مناسبة في قاعدة الموسوعة لهذا السؤال؛ تحقّق من النصوص الرسمية قبل الاعتماد على الإجابة.",
