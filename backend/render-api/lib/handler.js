@@ -335,7 +335,7 @@ export async function handleChat(req, res) {
       let gatewayPayload = {};
       try { gatewayPayload = JSON.parse(rawGateway); } catch {}
       if (!gatewayResponse.ok) {
-        console.error("AI Gateway fallback HTTP error:", gatewayResponse.status);
+        console.error("AI Gateway fallback error:", gatewayResponse.status, rawGateway);
         return null;
       }
       const gatewayAnswer = gatewayPayload.choices?.[0]?.message?.content;
